@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sweepr</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:flex-end;gap:20px"><svg width="49" height="43" viewBox="0 0 1653 1401" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;"><g id="Broom"><path d="M363.324,726.922l-86.294,37.13c-1.061,0.456 -2.262,0.457 -3.323,0.001c-1.061,-0.456 -1.888,-1.328 -2.287,-2.412l-246.673,-670.141c-8.685,-23.594 2.603,-49.859 25.697,-59.796l1.841,-0.792c13.271,-5.71 28.306,-5.713 41.58,-0.009c13.274,5.704 23.619,16.615 28.609,30.173l243.135,660.529c0.772,2.098 -0.231,4.433 -2.285,5.317Z" style="fill:#bb9b8f;stroke:#000;stroke-width:29.17px;"/><path d="M566.848,1259.313c21.827,22.08 56.237,25.604 82.087,8.406c59.54,-39.505 108.993,-87.148 139.96,-138.729c0.247,-0.411 0.284,-0.922 0.1,-1.361c-0.184,-0.438 -0.566,-0.745 -1.015,-0.816c-108.228,-17.047 -209.766,-116.116 -259.726,-320.549l-0,-0.001c-14.969,-60.999 -71.121,-99.347 -130.102,-88.852l-0.001,0c-59.765,10.696 -127.558,39.735 -177.653,84.449c-37.033,32.987 -51.61,86.357 -36.723,134.442l0.001,0.004c30.379,97.242 39.228,176.744 23.26,245.914c-15.951,69.094 -56.681,127.835 -125.312,183.663c-0.416,0.338 -0.617,0.897 -0.516,1.436c0.101,0.539 0.485,0.965 0.988,1.093c137.288,35.116 296.608,15.53 450.03,-39.38l0.054,-0.021c0.001,-0 0.001,-0 0.002,-0.001c3.174,-1.296 5.674,-3.842 6.911,-7.04c1.237,-3.197 1.102,-6.763 -0.373,-9.858c-37.622,-79.026 -71.624,-158.706 -91.682,-240.905c37.719,83.667 77.797,145.551 119.712,188.103Z" style="fill:#ecb953;stroke:#000;stroke-width:29.17px;"/><path d="M557.64,904.377c0,0 -352.495,127.897 -348.452,128.952c4.043,1.055 -21.648,-80.774 -21.648,-80.774l344.396,-126.748l25.704,78.57Z" style="fill:#9f654f;stroke:#000;stroke-width:29.17px;"/><path d="M271.42,1380.687c47.958,-71.241 54.762,-190.155 38.636,-271.06" style="fill:none;stroke:#000;stroke-width:29.17px;"/></g><g id="Trash"><path d="M1503.784,897.993c0,-0 -9.615,226.429 -15.764,371.247c-2.795,65.824 -57.363,117.529 -123.242,116.775c-89.478,-1.024 -211.379,-2.418 -298.246,-3.412c-60.325,-0.69 -109.346,-48.881 -111.066,-109.186c-4.056,-142.193 -10.68,-374.424 -10.68,-374.424l559,-1Z" style="fill:#bb9b8f;stroke:#000;stroke-width:25px;"/><path d="M1089.77,1018.584l2.028,237.491c0.011,1.242 -0.989,2.259 -2.231,2.269l-4.5,0.038c-1.242,0.011 -2.259,-0.989 -2.269,-2.231l-2.028,-237.491c-0.011,-1.242 0.989,-2.259 2.231,-2.269l4.5,-0.038c1.242,-0.011 2.259,0.989 2.269,2.231Z" style="fill:#bb9b8f;stroke:#000;stroke-width:25px;"/><path d="M1227.284,1018.618l0,237.5c0,1.242 -1.008,2.25 -2.25,2.25l-4.5,0c-1.242,0 -2.25,-1.008 -2.25,-2.25l0,-237.5c0,-1.242 1.008,-2.25 2.25,-2.25l4.5,0c1.242,0 2.25,1.008 2.25,2.25Z" style="fill:#bb9b8f;stroke:#000;stroke-width:25px;"/><path d="M1371.418,1018.747l-5.27,237.442c-0.028,1.242 -1.058,2.227 -2.299,2.2l-4.499,-0.1c-1.242,-0.028 -2.227,-1.058 -2.2,-2.299l5.27,-237.442c0.028,-1.242 1.058,-2.227 2.299,-2.2l4.499,0.1c1.242,0.028 2.227,1.058 2.2,2.299Z" style="fill:#bb9b8f;stroke:#000;stroke-width:25px;"/><path d="M1599.081,765.216c22.35,9.202 33.008,34.78 23.806,57.13c-9.185,22.308 -18.745,45.528 -18.745,45.528l-616.767,-253.943c0,0 6.773,-16.45 14.395,-34.961c11.605,-28.186 43.862,-41.627 72.048,-30.022c119.748,49.304 416.806,171.613 525.264,216.269Z" style="fill:#bb9b8f;stroke:#000;stroke-width:25px;"/><path d="M1236.308,577.982c47.595,-69.735 217.395,-7.59 203.969,85.081" style="fill:none;stroke:#000;stroke-width:25px;"/></g></svg><h1>Sweepr</h1></div>
+  <div class="header-right">
+    <select class="sort-select" id="sortSelect">
+      <option value="name">Sort: Name</option>
+      <option value="size">Sort: Size</option>
+      <option value="updated">Sort: Last Updated</option>
+      <option value="last_used">Sort: Last Used</option>
+    </select>
+    <input type="text" class="search-box" id="searchBox" placeholder="Search apps...">
+    <label class="toggle-label">
+      <input type="checkbox" id="hideSystem" checked>
+      Hide system apps
+    </label>
+    <button class="btn-refresh" id="refreshBtn">Refresh</button>
+    <button class="btn-analyze" id="analyzeStorageBtn">Analyze Storage</button>
+    <button class="theme-toggle" id="themeToggle" title="Toggle dark mode"></button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="apps" onclick="switchTab('apps')">Applications</button>
+  <button class="tab" data-tab="brew" onclick="switchTab('brew')">Homebrew</button>
+  <button class="tab" data-tab="npm" onclick="switchTab('npm')">npm</button>
+  <button class="tab" data-tab="orphans" onclick="switchTab('orphans')">Orphans</button>
+  <button class="tab" data-tab="agents" onclick="switchTab('agents')">Agents</button>
+  <span class="tab-count" id="tabCount"></span>
+</div>
+
+<div class="main">
+  <div class="app-list" id="appList"></div>
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-empty">Select an app to view details</div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<div id="storageView" class="storage-view hidden">
+  <div class="storage-topbar">
+    <button class="btn-refresh" id="storageBack">&larr; Back to Sweepr</button>
+    <div class="storage-title">Storage Analyzer</div>
+    <div class="storage-controls">
+      <select class="sort-select" id="storageSort">
+        <option value="size">Sort: Size</option>
+        <option value="name">Sort: Name</option>
+      </select>
+      <input type="text" class="search-box" id="storageSearch" placeholder="Filter this folder...">
+      <button class="btn-refresh" id="storageRefresh">Refresh</button>
+    </div>
+  </div>
+  <div class="breadcrumb storage-breadcrumb-row" id="storageBreadcrumb"></div>
+  <div class="storage-items" id="storageItems"></div>
+</div>
+
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/apps.js"></script>
+<script src="/static/js/brew.js"></script>
+<script src="/static/js/npm.js"></script>
+<script src="/static/js/orphans.js"></script>
+<script src="/static/js/agents.js"></script>
+<script src="/static/js/storage.js"></script>
+<script src="/static/js/main.js"></script>
+</body>
+</html>

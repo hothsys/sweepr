@@ -1,0 +1,2 @@
+# No external dependencies required.
+# Sweepr uses only the Python standard library.
