@@ -1,6 +1,6 @@
 # <img src="logo.svg" width="50" height="42" valign="bottom" />&nbsp;&nbsp;Sweepr
 
-A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, and orphaned files left behind by uninstalled apps.
+A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, LaunchAgents, and orphaned files left behind by uninstalled apps.
 
 ## Install
 
@@ -31,12 +31,13 @@ bash launchagent/uninstall.sh
 - **Applications**: scan `/Applications`, `/System/Applications`, and `~/Applications` with icons, version info, and size
 - **Associated files**: finds related preferences, caches, containers, and support files across `~/Library` when removing an app
 - **Storage analyzer**: a separate full-screen mode (opened from the "Analyze Storage" button, since it is read-only) that drills into top-level folders (Home, Documents, Downloads, Library, Applications, and more) with live-computed sizes, largest first
-- **Orphan detection**: scans `~/Library` for files belonging to apps that are no longer installed
+- **Orphan detection**: scans `~/Library` (and `/Library/PrivilegedHelperTools`) for files belonging to apps that are no longer installed
 - **Homebrew**: lists all installed formulae and casks; uninstall directly from the UI
 - **npm**: lists all globally installed npm packages; uninstall directly from the UI
+- **LaunchAgents**: lists user and system LaunchAgents and LaunchDaemons, flags stale or failing ones, and removes them (unloading the job too)
 - **Custom uninstaller detection**: finds official uninstallers bundled with apps and surfaces them before you trash anything
 - **Risk assessment**: warns before removing dependencies, system-integrated apps, or toolchain packages
-- **Show in Finder**: reveal any file or app in Finder from the UI
+- **Show in Finder**: reveal an app, or any folder or file in the storage analyzer, in Finder
 - **Dark mode**: follows your system setting with a manual toggle
 - **Progressive loading**: app list appears in under 1 second; sizes load in the background
 
@@ -79,7 +80,7 @@ The log captures startup, every HTTP request, scan durations, file operations, s
 
 ## How It Works
 
-`server.py` is a Python HTTP server with no framework dependencies. Scanning and removal logic lives in small single-purpose modules under `lib/`, and the frontend is plain HTML, CSS, and vanilla JavaScript under `static/`, split by responsibility into modules under `static/js/`, with no build step and no `node_modules`. On startup, applications are scanned using batched Spotlight metadata queries and parallel size calculation so the UI loads instantly, while Homebrew and npm data are warmed in the background.
+`server.py` is a Python HTTP server with no framework dependencies. Scanning and removal logic lives in small single-purpose modules under `lib/`, and the frontend is plain HTML, CSS, and vanilla JavaScript under `static/`, split by responsibility into modules under `static/js/`, with no build step and no `node_modules`. On startup, applications are scanned using batched Spotlight metadata queries and parallel size calculation so the UI loads instantly, while Homebrew, npm, and the storage analyzer's top-level folder sizes are warmed in the background.
 
 For the full breakdown of backend modules, the frontend module split, the API endpoints, and the request and data flow, see the [Architecture](docs/architecture.md) doc.
 
