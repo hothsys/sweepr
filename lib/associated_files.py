@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from lib.log import log
-from lib.sizes import disk_usage
+from lib.sizes import disk_usage, is_protected_container
 
 HOME = Path.home()
 
@@ -125,6 +125,8 @@ def _file_entry(path, category, sharing_apps):
         "size": size,
         "is_directory": os.path.isdir(path) and not os.path.islink(path),
     }
+    if is_protected_container(path):
+        entry["protected"] = True
     if sharing_apps:
         entry["shared_with"] = sharing_apps
     return entry

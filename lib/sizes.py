@@ -47,3 +47,23 @@ def disk_usage(path):
                 seen_inodes.add(key)
             total += fst.st_blocks * 512
     return total, complete
+
+
+CONTAINER_MARKER = ".com.apple.containermanagerd.metadata.plist"
+
+
+def is_protected_container(path):
+    """True for an app container (or group container) that macOS won't let this
+    process read. Newer macOS blocks other programs, Finder included, from
+    removing another app's container, so it can't be trashed from here."""
+    marker = os.path.join(str(path), CONTAINER_MARKER)
+    if not os.path.lexists(marker):
+        return False
+    try:
+        with open(marker, "rb") as f:
+            f.read(1)
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False

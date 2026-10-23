@@ -14,7 +14,12 @@ async function fetchApps(refresh) {
   indexApps();
   // Keep the selection pointing at the fresh object so size updates reach it
   if (selectedApp) selectedApp = apps.find(a => a.path === selectedApp.path) || null;
-  if (gen === fetchGeneration && currentTab === 'apps') renderAppList();
+  if (gen === fetchGeneration && currentTab === 'apps') {
+    renderAppList();
+    // Refresh also re-checks the app being viewed (its running state and files),
+    // which otherwise stayed as they were when it was first clicked
+    if (refresh && selectedApp) selectApp(appIdentifier(selectedApp));
+  }
   pollSizes();
   preloadOtherTabs();
 }
@@ -116,6 +121,45 @@ async function selectApp(id) {
   isLoadingFiles = false;
   associatedFiles = files;
   renderDetail();
+  watchRunning(app);
+}
+
+// ── Running-state watcher for the app being viewed ──
+// Apps get quit or launched while their detail is open, so re-check every few
+// seconds and update just the badge (re-rendering would reset the checkboxes).
+
+const RUNNING_POLL_MS = 5000;
+let _runningTimer = null;
+let _runningWatchGen = 0;
+
+function watchRunning(app) {
+  clearTimeout(_runningTimer);
+  const token = ++_runningWatchGen;
+  const tick = async () => {
+    if (token !== _runningWatchGen || selectedApp !== app) return;
+    // Paused (but still scheduled) while the page is hidden or another tab is open
+    if (!document.hidden && currentTab === 'apps' && !isRemoving) {
+      try {
+        const data = await fetchJson(`/api/apps/${encodeURIComponent(appIdentifier(app))}/running`);
+        if (token !== _runningWatchGen || selectedApp !== app) return;
+        if (!!data.running !== !!app._running) {
+          app._running = data.running;
+          updateRunningBadge(app);
+        }
+      } catch {
+        // transient; try again next tick
+      }
+    }
+    _runningTimer = setTimeout(tick, RUNNING_POLL_MS);
+  };
+  _runningTimer = setTimeout(tick, RUNNING_POLL_MS);
+}
+
+function updateRunningBadge(app) {
+  const title = detailPanel.querySelector('.detail-title');
+  if (!title || selectedApp !== app) return;
+  title.querySelector('.running-badge')?.remove();
+  if (app._running) title.insertAdjacentHTML('beforeend', ' <span class="running-badge">Running</span>');
 }
 
 function renderDetailLoading() {
@@ -215,12 +259,13 @@ function renderDetail() {
     filesHtml = '<div class="files-list">';
     for (let i = 0; i < associatedFiles.length; i++) {
       const f = associatedFiles[i];
-      // Files also used by another installed copy of the app start unchecked
+      // Files also used by another installed copy of the app start unchecked;
+      // containers macOS protects can't be removed at all
       const shared = f.shared_with && f.shared_with.length;
       filesHtml += `<div class="file-item">
-        <input type="checkbox" ${shared ? '' : 'checked'} data-idx="${i}">
+        <input type="checkbox" ${f.protected ? 'disabled' : shared ? '' : 'checked'} data-idx="${i}">
         <span class="file-category">${escHtml(f.category)}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(', '))}">shared</span>` : ''}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(', '))}">shared</span>` : ''}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
     }
@@ -230,7 +275,7 @@ function renderDetail() {
   // Computed from the data, not the DOM: the panel still holds the previous app's
   // checkboxes at this point, whose indexes may not exist in associatedFiles
   const totalSelected = associatedFiles
-    .filter(f => !(f.shared_with && f.shared_with.length))
+    .filter(f => !f.protected && !(f.shared_with && f.shared_with.length))
     .reduce((sum, f) => sum + (f.size || 0), 0);
   const canTrash = !app.is_system && !app.is_self && !isRemoving;
 

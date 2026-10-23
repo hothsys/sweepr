@@ -277,7 +277,7 @@ def _parse_formula(f, cellar):
         "version": version,
         "description": f.get("desc", ""),
         "type": "formula",
-        "installed_on_request": inst.get("installed_on_request", False),
+        "installed_on_request": inst.get("installed_on_request"),  # None if brew omits it: unknown, not "dependency"
         "installed_at": _format_timestamp(timestamp),
         "size": 0,
         "_cellar_path": cellar_path if cellar_path and os.path.isdir(cellar_path) else None,
