@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from lib.log import log
-from lib.sizes import disk_usage
+from lib.sizes import disk_usage, is_protected_container
 
 HOME = Path.home()
 
@@ -158,6 +158,7 @@ def scan_orphans(known_bundle_ids, known_app_names):
                 "is_directory": entry.is_dir(),
                 "likely_app": app_name,
                 "bundle_id": entry_id or name,
+                "protected": is_protected_container(entry),
             })
 
     for o in orphans:

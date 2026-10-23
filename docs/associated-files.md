@@ -31,7 +31,7 @@ The following locations are searched, and each match is tagged with its category
 Sweepr builds a set of match patterns from the app's identity:
 
 - The full bundle id (for example `com.google.Chrome`).
-- The last segment of the bundle id (`Chrome`), but only if it is distinctive: at least five characters and not a generic word (`GENERIC_TAILS`: `mac`, `app`, `media`, `launcher`, `daemon`, ...). Otherwise `com.postman.mac` would claim everything starting with `mac-`.
+- The last segment of the bundle id (`Chrome`), but only if the id has at least three parts and the segment is distinctive: at least five characters and not a generic word (`GENERIC_TAILS`: `mac`, `app`, `media`, `launcher`, `daemon`, ...). Otherwise `com.postman.mac` would claim everything starting with `mac-`.
 - The display name (three characters or more), and the display name with spaces removed.
 
 An entry matches when its name equals a pattern, starts with `pattern.`, starts with `pattern-`, or its stem (name without extension) equals a pattern. This catches files like `com.google.Chrome.plist`, `com.google.Chrome.savedState`, and `Google Chrome` folders while avoiding unrelated names.
@@ -47,7 +47,7 @@ If the app has a bundle id, Sweepr also runs `mdfind "kMDItemCFBundleIdentifier 
 
 ## Sizes and de-duplication
 
-Every match is sized with `lib/sizes.py` (on-disk usage like `du`; symlinks aren't followed and hard links count once) and paths are resolved so the same file is never listed twice. The trash endpoint only accepts files from this list, and computes the space freed itself. The detail view lets you uncheck individual files before removing; unchecked files are left alone.
+Every match is sized with `lib/sizes.py` (on-disk usage like `du`; symlinks aren't followed and hard links count once) and paths are resolved so the same file is never listed twice. App containers that macOS won't let Sweepr read (`is_protected_container`) are listed but flagged `protected`: the detail view shows a "protected by macOS" badge with the checkbox disabled, and they are left out of the trashable list (see [Protected app containers](removal.md#protected-app-containers)). The trash endpoint only accepts files from this list, and computes the space freed itself. The detail view lets you uncheck individual files before removing; unchecked files are left alone.
 
 ## Full Disk Access
 

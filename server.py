@@ -623,7 +623,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         log.info("_handle_files: searching associated files for '%s'", app["name"])
         files = find_associated_files(app["bundle_id"], app["name"], app["path"], _other_apps(app))
         with _offered_lock:
-            _offered_files[app["path"]] = {f["path"] for f in files}
+            _offered_files[app["path"]] = {f["path"] for f in files if not f.get("protected")}
         total = sum(f["size"] for f in files)
         log.info("_handle_files: found %d files (%.1f KB) for '%s'", len(files), total / 1024, app["name"])
         self._send_json({"bundle_id": app["bundle_id"], "files": files, "total_size": total})
@@ -663,7 +663,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if offered is None:
             log.info("_handle_trash: no file list cached for '%s', scanning now", app["name"])
             offered = {f["path"] for f in find_associated_files(app["bundle_id"], app["name"], app["path"],
-                                                                _other_apps(app))}
+                                                                _other_apps(app)) if not f.get("protected")}
         unknown = [fp for fp in file_paths if fp not in offered]
         if unknown:
             log.warning("_handle_trash: rejected %d path(s) not associated with '%s': %s",
@@ -815,7 +815,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         orphans = scan_orphans(known_ids, known_names)
         with _offered_lock:
             _offered_orphans.clear()
-            _offered_orphans.update(f["path"] for g in orphans for a in g["apps"] for f in a["files"])
+            _offered_orphans.update(f["path"] for g in orphans for a in g["apps"] for f in a["files"]
+                                    if not f.get("protected"))
         total_size = sum(g["total_size"] for g in orphans)
         log.info("_handle_orphans: found %d groups, %.1f MB", len(orphans), total_size / 1024 / 1024)
         self._send_json({"groups": orphans, "total_size": total_size})

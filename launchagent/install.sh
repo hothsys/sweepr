@@ -110,7 +110,7 @@ if curl -s -o /dev/null -w "%{http_code}" "\$URL/api/health" 2>/dev/null | grep 
 fi
 
 # Start server in background with full PATH so brew/npm are found
-PATH="$FULL_PATH" "\$PYTHON" "\$SERVER_SCRIPT" &
+PATH="$FULL_PATH" "\$PYTHON" "\$SERVER_SCRIPT" --no-browser &
 
 # Wait for server to be ready (up to 5 seconds)
 for i in \$(seq 1 50); do

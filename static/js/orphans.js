@@ -124,16 +124,20 @@ function renderOrphanDetail() {
     </div>`;
     appsHtml += '<div class="files-list">';
     for (const f of sortedFiles) {
+      // Protected containers are listed for information but can't be removed
       appsHtml += `<div class="file-item">
-        <input type="checkbox" checked data-idx="${fileIdx}" class="orphan-cb">
+        <input type="checkbox" ${f.protected ? 'disabled' : 'checked'} data-idx="${fileIdx}" class="orphan-cb">
         <span class="file-category">${escHtml(f.vendor || '')}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
       fileIdx++;
     }
     appsHtml += '</div>';
   }
+
+  const removable = cat.files.filter(f => !f.protected);
+  const removableSize = removable.reduce((s, f) => s + f.size, 0);
 
   detailPanel.innerHTML = `
     <div class="detail-header">
@@ -147,8 +151,8 @@ function renderOrphanDetail() {
     ${appsHtml}
     ${renderRiskBanner({ level: 'low', reason: 'Named for apps that are no longer installed. Matching is by name, so review the list; everything goes to the Trash and can be restored' })}
     <div class="action-bar">
-      <div class="total-size">Selected: <span>${formatBytes(cat.total_size)}</span></div>
-      <button class="btn-cleanup" onclick="confirmOrphanCleanup()">Clean Up</button>
+      <div class="total-size">Selected: <span>${formatBytes(removableSize)}</span></div>
+      <button class="btn-cleanup" ${removable.length ? 'onclick="confirmOrphanCleanup()"' : 'disabled'}>Clean Up</button>
     </div>
   `;
 
@@ -183,6 +187,7 @@ function _getCategoryFiles() {
 function confirmOrphanCleanup() {
   if (!selectedOrphan) return;
   const paths = getSelectedOrphanPaths();
+  if (!paths.length) { showToast('Nothing selected', 'error'); return; }
   openModal(`
       <h3>Clean up orphaned files?</h3>
       <p>This will move ${paths.length} orphaned file${paths.length !== 1 ? 's' : ''} from <strong>${escHtml(selectedOrphan.category)}</strong> to the Trash.</p>

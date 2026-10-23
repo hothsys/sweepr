@@ -5,10 +5,10 @@ Common messages and issues, and what to do about them.
 ## "permission denied for ..." in the log
 
 ```
-scan_orphans: permission denied for Accounts (/Users/you/Library/Accounts)
+find_associated_files: permission denied for Cookies (/Users/you/Library/Cookies)
 ```
 
-macOS protects certain folders (Accounts, Cookies, Mail, Safari, Messages, and parts of Containers) under its privacy system (TCC). A plain process cannot read them without Full Disk Access. Sweepr catches the error, skips that one location, and continues. Nothing breaks and the other locations still scan.
+macOS protects certain folders (Accounts, Cookies, Mail, Safari, Messages, and parts of Containers) under its privacy system (TCC). A plain process cannot read them without Full Disk Access. Sweepr catches the error, skips that one location, and continues. The associated-files lookup logs this at `DEBUG` on every app it inspects, so seeing it repeatedly is normal; the orphan scan skips `~/Library/Accounts` entirely, so it no longer reports that one. A `_parse_agent: could not parse ... permission denied` warning means a root-only plist in `/Library/LaunchDaemons` couldn't be read; the agent is still listed under its file name, just without its details. Nothing breaks and the other locations still scan.
 
 Options:
 
@@ -41,9 +41,9 @@ If the Homebrew tab shows a "Homebrew needs attention" banner, `brew` itself is 
 
 Sweepr labels the app date as "App version date" and sources it from `kMDItemContentModificationDate`. This reflects when the developer built or last modified the app, not when you installed it, and it can shift after a macOS upgrade. It is intentionally not presented as your install date. See [Application scanning](scanning.md).
 
-## An app reappears after removal, or shows "0 associated files"
+## An app reappears after removal, or shows "No associated files found"
 
-The list only drops an app when the server confirms its bundle path was actually trashed, so a partial failure will not make an app vanish. If you see "0 associated files," the name and bundle id genuinely matched nothing under `~/Library`; that is common for small or sandboxed apps. See [Associated files](associated-files.md).
+The list only drops an app when the server confirms its bundle path was actually trashed, so a partial failure will not make an app vanish. If you see "No associated files found," the name and bundle id genuinely matched nothing in the Library folders Sweepr searches or in Spotlight; that is common for small or sandboxed apps. See [Associated files](associated-files.md).
 
 ## The app icon is blank
 

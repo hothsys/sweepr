@@ -1,12 +1,18 @@
 import os
 import plistlib
-import shutil
 import signal
 import subprocess
 import time
 from pathlib import Path
 
 from lib.log import log
+from lib.sizes import CONTAINER_MARKER
+
+PROTECTED_CONTAINER_HELP = (
+    "macOS protects this app container: other programs, Finder included, aren't allowed to "
+    "remove it. It's harmless to leave. To remove it, give your terminal app (Terminal, "
+    "iTerm, Hyper...) Full Disk Access in System Settings > Privacy & Security, delete the "
+    "folder from it, then turn the access off again.")
 
 PROTECTED_PREFIXES = (
     "/System/",
@@ -254,14 +260,22 @@ def _trash_single(path):
             i += 1
     log.debug("_trash_single: moving %s → %s", path, dest)
     try:
-        shutil.move(str(p), str(dest))
+        # A plain rename only. shutil.move falls back to copy-then-delete when the
+        # rename is refused, which for a protected folder (another app's container
+        # on newer macOS) copied part of it into the Trash, failed on a protected
+        # file and left both the partial copy and the original behind.
+        os.rename(str(p), str(dest))
         return True, ""
-    except PermissionError:
-        log.warning("_trash_single: permission denied, falling back to Finder for %s", path)
-        return _trash_via_osascript(path)
     except OSError as e:
-        log.error("_trash_single: OSError for %s: %s", path, e)
-        return False, str(e)
+        if isinstance(e, PermissionError) and os.path.lexists(os.path.join(path, CONTAINER_MARKER)):
+            # Another app's container: macOS blocks Finder too (it fails with "you
+            # don't have permission"), so don't pop that dialog on top of ours
+            log.warning("_trash_single: %s is a protected app container: %s", path, e)
+            return False, PROTECTED_CONTAINER_HELP
+        # EPERM/EACCES: protected or root-owned. EXDEV: on another volume, whose
+        # Trash is elsewhere. Finder handles these, asking for permission as needed.
+        log.warning("_trash_single: rename refused for %s (%s), falling back to Finder", path, e)
+        return _trash_via_osascript(path)
 
 
 def _trash_via_osascript(path):

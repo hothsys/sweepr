@@ -142,7 +142,7 @@ def stream_dir_sizes(path, on_child):
         )
     except OSError as e:
         log.error("stream_dir_sizes: du failed to start for %s: %s", target, e)
-        # Fallback: at least compute the total apparent size.
+        # Fallback: at least compute the total (on-disk usage, like du).
         return calculate_dir_size(target)
 
     # Watchdog: reading stdout blocks, so a hung du can only be stopped from outside
