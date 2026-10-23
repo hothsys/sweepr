@@ -28,7 +28,7 @@ The log uses a `RotatingFileHandler` capped at 10 MB with 3 backups. When `sweep
 
 ## Reading a page refresh
 
-A browser refresh reads as a clear initialization sequence. The page is served with no-cache, so every refresh re-requests the shell and all eight JS modules:
+A browser refresh reads as a clear initialization sequence. The page is served with no-cache, so every refresh re-requests the shell and all nine JS modules. With the `HTTP "GET ..." 200` access lines filtered out, it looks like this:
 
 ```
 ────────────────────────────────────────────────────────────
@@ -40,15 +40,16 @@ Client loaded Sweepr UI: initializing modules + data
   → init module: npm.js
   → init module: orphans.js
   → init module: agents.js
+  → init module: storage.js
   → init module: main.js
 GET /api/apps → 133 apps
 ```
 
-After the modules load, the data calls follow (`/api/apps`, then background `/api/brew` and `/api/npm`), each logged with its result count. This makes it easy to correlate a burst of requests to a specific refresh. CSS loads are logged at debug level to keep the sequence readable.
+The browser fetches the modules in parallel, so the access lines (logged at `INFO` too) interleave with these. After the modules load, the data calls follow (`/api/apps`, then background `/api/brew` and `/api/npm`), each logged with its result count. This makes it easy to correlate a burst of requests to a specific refresh. CSS loads are logged at debug level to keep the sequence readable.
 
 ## Expected warnings
 
 Some warnings are normal and do not indicate a problem:
 
-- `permission denied for Accounts (...)` and similar: a macOS privacy-protected location was skipped because Sweepr lacks Full Disk Access. The scan continues. See [Troubleshooting](troubleshooting.md).
+- `find_associated_files: permission denied for Cookies (...)` (at `DEBUG`) and similar `permission denied` lines: a macOS privacy-protected location was skipped because Sweepr lacks Full Disk Access. The scan continues. See [Troubleshooting](troubleshooting.md).
 - `Server already running on port 47836`: a second instance tried to start while one was already up, and exited. See [Troubleshooting](troubleshooting.md).
