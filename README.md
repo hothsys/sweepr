@@ -1,6 +1,12 @@
-# <img src="logo.svg" width="50" height="42" valign="bottom" />&nbsp;&nbsp;Sweepr
+<p align="center">
+  <img src="logo.svg" alt="Sweepr logo" width="220">
+</p>
 
-A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, LaunchAgents, and orphaned files left behind by uninstalled apps.
+<h1 align="center">Sweepr</h1>
+
+<p align="center">
+  A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, LaunchAgents, and orphaned files left behind by uninstalled apps.  
+</p>
 
 ## Install
 
