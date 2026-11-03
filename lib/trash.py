@@ -36,6 +36,11 @@ PROTECTED_EXACT = {
         Path.home(),
         Path.home() / "Applications",
         Path.home() / "Library",
+        # Credentials and keys: never removable, whatever a scan matches
+        Path.home() / ".ssh",
+        Path.home() / ".gnupg",
+        Path.home() / ".aws",
+        Path.home() / ".kube",
         # Sweepr's own launcher and LaunchAgent; remove these with launchagent/uninstall.sh
         "/Applications/Sweepr.app",
         Path.home() / "Library" / "LaunchAgents" / "com.sweepr.server.plist",
@@ -246,11 +251,17 @@ def _trash_single(path):
         return False, "Path does not exist"
 
     trash_dir = Path.home() / ".Trash"
-    dest = trash_dir / p.name
+    # Finder hides dot-named items, inside the Trash too, so ~/.ollama would sit
+    # there invisibly: impossible to see or restore. Give it a visible name that
+    # records the original.
+    trash_name = f"{p.name[1:]} (was {p.name})" if p.name.startswith(".") and len(p.name) > 1 else p.name
+    dest = trash_dir / trash_name
     if os.path.lexists(dest):
         # Keep a real extension (Foo 1.app, notes 1.txt), but don't split
         # dotted folder names (com.google.Chrome -> com.google.Chrome 1)
-        if p.is_file() or p.suffix in (".app", ".plist", ".savedState", ".bundle"):
+        if trash_name != p.name:
+            base, suffix = trash_name, ""
+        elif p.is_file() or p.suffix in (".app", ".plist", ".savedState", ".bundle"):
             base, suffix = p.stem, p.suffix
         else:
             base, suffix = p.name, ""
@@ -272,10 +283,48 @@ def _trash_single(path):
             # don't have permission"), so don't pop that dialog on top of ours
             log.warning("_trash_single: %s is a protected app container: %s", path, e)
             return False, PROTECTED_CONTAINER_HELP
+        if os.path.islink(path):
+            # Never hand a symlink to Finder: its alias coercion follows the link,
+            # failing (-1700) when the target is gone and acting on the target
+            # instead of the link when it isn't. Move the link itself, with admin
+            # rights, which is what root-owned folders like /usr/local/bin need.
+            log.warning("_trash_single: rename refused for symlink %s (%s), moving it with admin rights", path, e)
+            return _trash_link_with_admin(path, str(dest))
         # EPERM/EACCES: protected or root-owned. EXDEV: on another volume, whose
         # Trash is elsewhere. Finder handles these, asking for permission as needed.
         log.warning("_trash_single: rename refused for %s (%s), falling back to Finder", path, e)
         return _trash_via_osascript(path)
+
+
+def _applescript_str(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _trash_link_with_admin(path, dest):
+    """Move a symlink (not its target) into the user's Trash with administrator
+    rights, then give it back to the user so emptying the Trash needs no password.
+    macOS shows its own password prompt; cancelling it fails cleanly."""
+    user = str(os.getuid())
+    script = ('do shell script "/bin/mv -n -- " & quoted form of {src} & " " & quoted form of {dst} '
+              '& " && /usr/sbin/chown -h {uid} " & quoted form of {dst} with administrator privileges'
+              ).format(src=_applescript_str(path), dst=_applescript_str(dest), uid=user)
+    try:
+        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        log.error("_trash_link_with_admin: timed out waiting for the password prompt for %s", path)
+        return False, "Timed out waiting for the administrator password"
+    except OSError as e:
+        log.error("_trash_link_with_admin: OSError for %s: %s", path, e)
+        return False, str(e)
+    if os.path.lexists(path):
+        err = result.stderr.strip()
+        if "-128" in err or "cancel" in err.lower():
+            log.info("_trash_link_with_admin: password prompt cancelled for %s", path)
+            return False, "Cancelled: administrator password is needed to remove this command link"
+        log.error("_trash_link_with_admin: failed for %s: %s", path, err)
+        return False, err or "Could not move the link"
+    log.info("_trash_link_with_admin: moved %s to %s", path, dest)
+    return True, ""
 
 
 def _trash_via_osascript(path):

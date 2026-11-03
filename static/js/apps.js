@@ -265,7 +265,7 @@ function renderDetail() {
       filesHtml += `<div class="file-item">
         <input type="checkbox" ${f.protected ? 'disabled' : shared ? '' : 'checked'} data-idx="${i}">
         <span class="file-category">${escHtml(f.category)}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(', '))}">shared</span>` : ''}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(', '))}">shared</span>` : ''}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
     }
@@ -360,6 +360,7 @@ function confirmTrash() {
   openModal(`
       <h3>Move to Trash?</h3>
       <p>${warning}This will move <strong>${escHtml(selectedApp.name)}</strong>${fileCount ? ` and ${fileCount} associated file${fileCount !== 1 ? 's' : ''}` : ''} to the Trash. You can recover them from the Trash if needed.</p>
+      ${trashNotes(selected.paths)}
       <div class="modal-actions">
         <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
         <button class="btn-confirm" onclick="doTrash()">Move to Trash</button>

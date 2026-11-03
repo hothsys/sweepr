@@ -40,6 +40,13 @@ An entry must pass every check below to be offered:
 
 Containers macOS won't let Sweepr read are still listed but flagged `protected` and can't be selected; see [Protected app containers](removal.md#protected-app-containers).
 
+### Outside ~/Library
+
+Two more kinds of leftovers come from `lib/home_data.py` (`_home_orphans`):
+
+- **Home Folder:** a `KNOWN_TOOLS` folder such as `~/.ollama` when the tool's app isn't installed, Spotlight finds no bundle of that name, and no command of that name is installed some other way (a Homebrew `ollama` would still use `~/.ollama`). Only the known-tools table is used here, not name guessing, since most hidden home folders belong to command-line tools rather than apps. The usual size and readability rule applies.
+- **Command-line Tools:** symlinks in `/usr/local/bin` or `/opt/homebrew/bin` that point into an `.app` bundle that no longer exists. They're listed even though they take no space, because they're broken commands. The detail view and confirmation dialog say what hidden folders will be called in the Trash (`ollama (was .ollama)`) and that moving command links needs an administrator password.
+
 ## Grouping
 
 The scanner groups results by vendor (derived from bundle id segments, with a lookup table for common vendors like Adobe, Microsoft, and JetBrains). The frontend (`static/js/orphans.js`) then regroups everything by **category** for display, ordered by a canonical list (Caches, Application Support, Containers, Preferences, and so on). Within a category the detail view breaks files down by the app they came from, so you can see and uncheck individual items before cleaning up. The banner reminds you that matching is by name.

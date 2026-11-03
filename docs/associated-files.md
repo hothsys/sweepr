@@ -41,6 +41,13 @@ An entry matches when its name equals a pattern, starts with `pattern.`, starts 
 - **More specific ids win.** If another installed app's bundle id extends this one (`com.cleverfiles.DiskDrill.Media` versus `com.cleverfiles.DiskDrill`), entries matching it belong to that app and are skipped.
 - **Shared ids are flagged.** If another installed app has the *same* bundle id (Photoshop 2025 and 2026), every match is marked `shared_with: [names]`. The detail view shows a "shared" badge and leaves those files unchecked, since the other copy still uses them.
 
+## Outside ~/Library
+
+Some apps keep their data in a hidden folder in your home folder rather than in `~/Library`, and link commands into `/usr/local/bin` or `/opt/homebrew/bin`. Ollama, for example, stores its downloaded models (often many GB) in `~/.ollama`. `lib/home_data.py` adds these to the list:
+
+- **Home Folder:** folders from `KNOWN_TOOLS` (Ollama, Docker, VS Code, Cursor, LM Studio), plus `~/.<name>`, `~/.config/<name>`, `~/.cache/<name>` and `~/.local/share/<name>` where `<name>` is the app name lowercased with spaces removed (four characters or more). Credential and toolchain folders in `NEVER` (`~/.ssh`, `~/.aws`, `~/.npm`, `~/.config` itself, ...) are never matched. If a command of the same name is installed some other way, such as Homebrew's `ollama`, the folder is shared with it: it's marked `shared_with` and starts unchecked.
+- **Command-line Tools:** symlinks in `/usr/local/bin` and `/opt/homebrew/bin` that point into the app bundle (Docker's `docker`, `kubectl`, ...; VS Code's `code`). They stop working once the app is gone. Root-owned links are removed through Finder, which asks for an administrator password.
+
 ## Spotlight pass
 
 If the app has a bundle id, Sweepr also runs `mdfind "kMDItemCFBundleIdentifier == '...'"` to catch anything the name-based search missed. That query returns every bundle with the id, including other installed copies or versions of the app and apps nested inside other products, so results that are an `.app` or inside one are always dropped, as is anything inside another installed app. Results under `/System/` and `/Library/Managed Preferences/` are excluded too. What remains is tagged with the "Spotlight" category.

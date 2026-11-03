@@ -87,6 +87,33 @@ function shortenPath(p) {
   return p;
 }
 
+// Name a path will have in the Trash: hidden items get a visible name (Finder
+// hides dot-named items inside the Trash too). Mirrors _trash_single in lib/trash.py.
+function trashName(path) {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  return name.length > 1 && name.startsWith('.') ? `${name.slice(1)} (was ${name})` : name;
+}
+
+function trashHint(path) {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  return trashName(path) !== name
+    ? ` <span class="file-hint" title="Finder hides names starting with a dot, so it gets a visible name in the Trash">goes to the Trash as “${escHtml(trashName(path))}”</span>`
+    : '';
+}
+
+// Notes for the confirm dialog about where selected items end up
+function trashNotes(paths) {
+  const notes = [];
+  const hidden = paths.filter(p => trashName(p) !== p.slice(p.lastIndexOf('/') + 1));
+  if (hidden.length) {
+    notes.push(`Hidden ${hidden.length === 1 ? 'item' : 'items'} will appear in the Trash as ${hidden.map(p => `“${escHtml(trashName(p))}”`).join(', ')}. To restore, put it back and rename it.`);
+  }
+  if (paths.some(p => p.startsWith('/usr/local/bin/') || p.startsWith('/opt/homebrew/bin/'))) {
+    notes.push('Command links live in a system folder, so macOS will ask for your administrator password.');
+  }
+  return notes.length ? `<p class="modal-note">${notes.join('<br>')}</p>` : '';
+}
+
 // Safe in text and in quoted attributes (quotes are escaped too)
 function escHtml(s) {
   return String(s == null ? '' : s)
