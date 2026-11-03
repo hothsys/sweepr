@@ -25,3 +25,20 @@ document.getElementById('analyzeStorageBtn').addEventListener('click', openStora
 
 appListEl.innerHTML = '<div class="loading-files"><span class="spinner"></span> Loading applications...</div>';
 fetchApps(false);
+
+// A running server keeps the code it started with. If Sweepr's files were updated
+// since, say so: otherwise fixes look like they "didn't work".
+async function checkForRestart() {
+  try {
+    const health = await fetchJson('/api/health');
+    if (health.restart_needed && !document.getElementById('restartBanner')) {
+      document.body.insertAdjacentHTML('afterbegin', `<div id="restartBanner" class="restart-banner">
+        Sweepr was updated after it started, so it's still running the previous version.
+        Restart it to apply the changes: press Ctrl+C where you started it and run <code>python3 server.py</code> again
+        (or, for the login item, <code>launchctl kickstart -k gui/$UID/com.sweepr.server</code>), then reload this page.
+      </div>`);
+    }
+  } catch {}
+}
+checkForRestart();
+setInterval(checkForRestart, 60000);

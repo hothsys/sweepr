@@ -841,3 +841,29 @@ body {
 .btn-reveal-row:hover {
   background: var(--bg-btn-secondary-hover);
 }
+
+/* Where an item ends up when it goes to the Trash (hidden items are renamed) */
+.file-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.modal-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 8px 0 0;
+}
+
+/* Shown when the server's code changed after it started */
+.restart-banner {
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--warning) 18%, var(--bg-surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border-primary));
+  color: var(--text-primary);
+}
+.restart-banner code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}

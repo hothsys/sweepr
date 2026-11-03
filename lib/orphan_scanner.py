@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lib.log import log
 from lib.sizes import disk_usage, is_protected_container
+from lib import home_data
 
 HOME = Path.home()
 
@@ -161,8 +162,10 @@ def scan_orphans(known_bundle_ids, known_app_names):
                 "protected": is_protected_container(entry),
             })
 
+    orphans += _home_orphans(known_names_lower)
+
     for o in orphans:
-        o["vendor"] = _extract_vendor(o["bundle_id"])
+        o["vendor"] = o.get("vendor") or _extract_vendor(o["bundle_id"])
 
     vendor_groups = {}
     for o in orphans:
@@ -306,6 +309,37 @@ def _helpers_in_use():
             if isinstance(label, str):
                 names.add(label)
     return names
+
+
+def _home_orphans(known_names_lower):
+    """Data outside ~/Library left by removed apps: KNOWN_TOOLS home folders
+    whose app is gone (not installed, not found by Spotlight) and whose command
+    isn't installed some other way, plus /usr/local/bin links into missing apps."""
+    found = []
+    for tool in home_data.KNOWN_TOOLS:
+        if any(a.lower() in known_names_lower for a in tool["apps"]):
+            continue
+        if home_data.external_command(tool["commands"]):
+            continue
+        existing = [f for f in tool["folders"] if (HOME / f).is_dir() and not (HOME / f).is_symlink()]
+        if not existing or home_data.app_bundle_exists_anywhere(tool["apps"]):
+            continue
+        for f in existing:
+            path = HOME / f
+            size, complete = disk_usage(path)
+            if size == 0 or not complete:
+                continue
+            found.append({"path": str(path), "category": "Home Folder", "size": size,
+                          "is_directory": True, "likely_app": tool["name"],
+                          "bundle_id": f, "vendor": tool["name"], "protected": False})
+    for link, app_path in home_data.dangling_app_links():
+        app = os.path.basename(app_path)[:-len(".app")]
+        found.append({"path": link, "category": "Command-line Tools", "size": 0,
+                      "is_directory": False, "likely_app": app, "bundle_id": os.path.basename(link),
+                      "vendor": app, "protected": False})
+    if found:
+        log.info("_home_orphans: %d item(s) outside ~/Library: %s", len(found), [o["path"] for o in found])
+    return found
 
 
 def _extract_bundle_id(name):

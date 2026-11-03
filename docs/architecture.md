@@ -16,6 +16,7 @@ Each module is single-purpose and has no framework dependencies.
 | --- | --- |
 | `scanner.py` | Discover installed applications, batch Spotlight metadata, compute sizes, detect custom uninstallers |
 | `sizes.py` | `disk_usage()`: on-disk size like `du` (no symlink following, hard links once) plus whether everything was readable, used by the app, associated-file, and orphan scanners and by app trashing; `is_protected_container()` flags app containers macOS won't let anything remove |
+| `home_data.py` | App data outside `~/Library`: known tools' hidden home folders (`~/.ollama`, `~/.vscode`, ...), name-based `~/.<app>` matches, and command links in `/usr/local/bin` / `/opt/homebrew/bin`; used by the associated-file and orphan scans |
 | `associated_files.py` | Find preferences, caches, containers, and support files tied to an app across `~/Library` |
 | `orphan_scanner.py` | Scan `~/Library` (and system paths) for leftovers of apps no longer installed |
 | `brew_scanner.py` | List and uninstall Homebrew formulae and casks (quick list plus background detail pass) |

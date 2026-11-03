@@ -15,6 +15,10 @@ Options:
 1. **Leave it (recommended).** These locations rarely hold removable orphans and are sensitive. The scan works fine without them.
 2. **Grant Full Disk Access:** System Settings, Privacy & Security, Full Disk Access, add your Python binary. Not recommended for a tool whose job is deleting files, since it widens what Sweepr can touch.
 
+## A fix "didn't work", or a yellow "Sweepr was updated" banner
+
+A running server keeps the Python code it started with. If Sweepr's files are updated (copied in, edited) while it runs, nothing changes until it restarts; the page notices (`restart_needed` from `/api/health`, checked on load and every minute) and shows a banner. Restart it: Ctrl+C in the terminal and `python3 server.py` again, or for the login item `launchctl kickstart -k gui/$UID/com.sweepr.server`, then reload the page. Changes to the HTML, CSS and JavaScript only need a page reload.
+
 ## "Server already running on port 47836"
 
 A second instance tried to start while one was already running. Sweepr keeps a PID file at `/tmp/sweepr.pid`; on startup it checks whether that process is alive and, if so, exits with this warning instead of double-binding the port.
@@ -34,6 +38,8 @@ If you run Sweepr as a LaunchAgent, note that `launchctl stop` only controls the
 ## Homebrew or npm tab is empty
 
 When Sweepr runs as a LaunchAgent it has a minimal environment. If `brew` or `npm` is not on `PATH`, those scans find nothing. The plist and launcher set `PATH` to include `/opt/homebrew/bin` and `/usr/local/bin`; confirm those entries are present. Running the server manually in a normal shell (where `brew`/`npm` are on `PATH`) also resolves it.
+
+If the npm tab says "npm was not found", Sweepr found no npm on `PATH` or in the usual nvm, fnm, Volta, asdf, mise and Homebrew locations (see [Homebrew and npm](homebrew-and-npm.md)). Run `which npm` in your terminal; if it points somewhere else, that location needs adding to `find_npm()` in `lib/npm_scanner.py`.
 
 If the Homebrew tab shows a "Homebrew needs attention" banner, `brew` itself is failing. The banner shows the fix command when Homebrew provides one. Check the log for `scan_homebrew: brew info returned`. A common cause is an Xcode or Command Line Tools update that needs its license accepted: run `sudo xcodebuild -license accept`, then click refresh in the Homebrew tab.
 

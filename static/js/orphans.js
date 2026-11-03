@@ -6,7 +6,7 @@ const ORPHAN_CATEGORY_ORDER = [
   'Preferences (ByHost)', 'Saved Application State', 'Group Containers',
   'HTTP Storages', 'Accounts', 'System Launch Agents',
   'System Launch Daemons', 'Privileged Helpers',
-  'Logs', 'Launch Agents', 'Spotlight',
+  'Logs', 'Launch Agents', 'Spotlight', 'Home Folder', 'Command-line Tools',
 ];
 
 let orphanCategories = []; // derived from orphanGroups, grouped by category
@@ -128,7 +128,7 @@ function renderOrphanDetail() {
       appsHtml += `<div class="file-item">
         <input type="checkbox" ${f.protected ? 'disabled' : 'checked'} data-idx="${fileIdx}" class="orphan-cb">
         <span class="file-category">${escHtml(f.vendor || '')}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
       fileIdx++;
@@ -149,6 +149,8 @@ function renderOrphanDetail() {
       </div>
     </div>
     ${appsHtml}
+    ${cat.category === 'Home Folder' ? '<p class="modal-note">Hidden folders get a visible name in the Trash (for example \u201collama (was .ollama)\u201d), since Finder hides names starting with a dot. Empty the Trash to free the space.</p>' : ''}
+    ${cat.category === 'Command-line Tools' ? '<p class="modal-note">These links are in a system folder, so macOS will ask for your administrator password to move them to the Trash.</p>' : ''}
     ${renderRiskBanner({ level: 'low', reason: 'Named for apps that are no longer installed. Matching is by name, so review the list; everything goes to the Trash and can be restored' })}
     <div class="action-bar">
       <div class="total-size">Selected: <span>${formatBytes(removableSize)}</span></div>
@@ -191,6 +193,7 @@ function confirmOrphanCleanup() {
   openModal(`
       <h3>Clean up orphaned files?</h3>
       <p>This will move ${paths.length} orphaned file${paths.length !== 1 ? 's' : ''} from <strong>${escHtml(selectedOrphan.category)}</strong> to the Trash.</p>
+      ${trashNotes(paths)}
       <div class="modal-actions">
         <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
         <button class="btn-confirm" onclick="doOrphanCleanup()">Move to Trash</button>
@@ -222,7 +225,7 @@ async function doOrphanCleanup() {
     const result = await postJson('/api/orphans/trash', { paths });
     if (result.success && result.success.length > 0) {
       const failedNote = result.failed && result.failed.length ? `, ${result.failed.length} failed` : '';
-      showToast(`Cleaned up ${result.success.length} file(s)${failedNote}`, result.failed && result.failed.length ? 'error' : 'success');
+      showToast(`Moved ${result.success.length} item(s) to the Trash${failedNote}`, result.failed && result.failed.length ? 'error' : 'success');
       selectedOrphan = null;
       if (currentTab === 'orphans') detailPanel.innerHTML = '<div class="detail-empty">Select a category to view files</div>';
       await fetchOrphans();

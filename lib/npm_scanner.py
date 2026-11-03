@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -11,28 +13,107 @@ from lib.log import log
 PROTECTED_PACKAGES = {"npm", "corepack"}
 
 
+HOME = os.path.expanduser("~")
+
+
+def _version_key(name):
+    return [int(p) if p.isdigit() else -1 for p in re.split(r"[^0-9]+", name) if p]
+
+
+def _nvm_npm():
+    """npm from nvm's default version (alias/default), else its newest version."""
+    nvm_dir = os.environ.get("NVM_DIR") or os.path.join(HOME, ".nvm")
+    versions_dir = os.path.join(nvm_dir, "versions", "node")
+    try:
+        versions = [v for v in os.listdir(versions_dir) if v.startswith("v")]
+    except OSError:
+        return None
+    if not versions:
+        return None
+    versions.sort(key=_version_key, reverse=True)
+    chosen = versions[0]
+    try:
+        with open(os.path.join(nvm_dir, "alias", "default")) as f:
+            alias = f.read().strip()
+        # "16", "v16.20", "v16.20.2" pick the newest match; "node", "lts/*" etc. keep the newest
+        wanted = alias.lstrip("v")
+        if wanted and wanted[0].isdigit():
+            match = [v for v in versions if v[1:] == wanted or v[1:].startswith(wanted + ".")]
+            if match:
+                chosen = match[0]
+    except OSError:
+        pass
+    npm = os.path.join(versions_dir, chosen, "bin", "npm")
+    return npm if os.access(npm, os.X_OK) else None
+
+
+def find_npm():
+    """Path to the npm to use, or None.
+
+    PATH comes first (what the user's shell would run). It's often missing npm,
+    though: Node version managers add themselves to PATH from shell startup
+    files (nvm frequently lazily), which a server started by launchd, by
+    Sweepr.app, or from a non-interactive shell never runs. So the usual install
+    locations are checked too.
+    """
+    found = shutil.which("npm")
+    if found:
+        return found
+    candidates = [
+        _nvm_npm(),
+        os.path.join(HOME, "Library", "Application Support", "fnm", "aliases", "default", "bin", "npm"),
+        os.path.join(HOME, ".local", "share", "fnm", "aliases", "default", "bin", "npm"),
+        os.path.join(HOME, ".fnm", "aliases", "default", "bin", "npm"),
+        os.path.join(HOME, ".volta", "bin", "npm"),
+        os.path.join(HOME, ".asdf", "shims", "npm"),
+        os.path.join(HOME, ".local", "share", "mise", "shims", "npm"),
+        "/opt/homebrew/bin/npm",
+        "/usr/local/bin/npm",
+    ]
+    for c in candidates:
+        if c and os.access(c, os.X_OK):
+            log.info("find_npm: npm not on PATH, using %s", c)
+            return c
+    log.warning("find_npm: npm not found on PATH or in nvm/fnm/Volta/asdf/mise/Homebrew locations")
+    return None
+
+
+def _npm_env(npm):
+    """npm runs itself with `#!/usr/bin/env node`, so its own folder (where that
+    Node's `node` lives) has to come first on PATH."""
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(npm) + os.pathsep + env.get("PATH", "")
+    return env
+
+
+NOT_FOUND = ("npm was not found (checked PATH, nvm, fnm, Volta, asdf, mise and Homebrew)")
+
+
 def scan_npm_globals():
     """Returns (packages, error). error is None on success; on failure packages
     is empty and error says why, so the UI can tell "none installed" from "broken"."""
     t0 = time.time()
-    log.info("scan_npm_globals: starting")
+    npm = find_npm()
+    if not npm:
+        return [], NOT_FOUND
+    log.info("scan_npm_globals: starting (%s)", npm)
     try:
         result = subprocess.run(
-            ["npm", "list", "-g", "--json", "--depth=0"],
-            capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL,
+            [npm, "list", "-g", "--json", "--depth=0"],
+            capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL, env=_npm_env(npm),
         )
         data = json.loads(result.stdout)
     except subprocess.TimeoutExpired:
         log.error("scan_npm_globals: npm list timed out")
         return [], "npm list timed out"
     except OSError as e:
-        log.error("scan_npm_globals: npm not found: %s", e)
-        return [], "npm was not found on PATH"
+        log.error("scan_npm_globals: could not run %s: %s", npm, e)
+        return [], f"could not run {npm}: {e}"
     except json.JSONDecodeError as e:
         log.error("scan_npm_globals: failed to parse npm output: %s", e)
         return [], "could not parse npm output"
 
-    npm_root = _get_npm_root()
+    npm_root = _get_npm_root(npm)
     if not npm_root:
         log.error("scan_npm_globals: could not determine npm root")
         return [], "could not determine the npm global folder"
@@ -59,10 +140,10 @@ def scan_npm_globals():
     return packages, None
 
 
-def _get_npm_root():
+def _get_npm_root(npm):
     try:
         result = subprocess.run(
-            ["npm", "root", "-g"],
+            [npm, "root", "-g"], env=_npm_env(npm),
             capture_output=True, text=True, timeout=5,
         )
         root = result.stdout.strip()
@@ -115,9 +196,12 @@ def uninstall_package(name):
         return {"success": False, "error": "Invalid package name"}
 
     log.info("uninstall_package (npm): npm uninstall -g %s", name)
+    npm = find_npm()
+    if not npm:
+        return {"success": False, "error": NOT_FOUND}
     try:
         result = subprocess.run(
-            ["npm", "uninstall", "-g", name],
+            [npm, "uninstall", "-g", name], env=_npm_env(npm),
             capture_output=True, text=True, timeout=60,
         )
         if result.returncode == 0:

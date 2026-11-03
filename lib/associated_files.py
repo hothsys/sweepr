@@ -5,6 +5,7 @@ from pathlib import Path
 
 from lib.log import log
 from lib.sizes import disk_usage, is_protected_container
+from lib.home_data import home_folders_for_app, external_command, cli_links_into
 
 HOME = Path.home()
 
@@ -109,6 +110,23 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
             if not os.path.lexists(fpath):
                 continue
             results.append(_file_entry(fpath, "Spotlight", sharing_apps))
+
+    # Data outside ~/Library: hidden home folders (~/.ollama holds Ollama's models)
+    # and the commands the app linked into /usr/local/bin
+    for path, commands in home_folders_for_app(app_name):
+        if path in seen_paths:
+            continue
+        seen_paths.add(path)
+        entry = _file_entry(path, "Home Folder", sharing_apps)
+        other = external_command(commands, app_path)
+        if other:
+            # A separately installed command (e.g. Homebrew's) uses the same folder
+            entry["shared_with"] = entry.get("shared_with", []) + [other]
+        results.append(entry)
+    for link in cli_links_into(app_path):
+        if link not in seen_paths:
+            seen_paths.add(link)
+            results.append(_file_entry(link, "Command-line Tools", sharing_apps))
 
     results.sort(key=lambda r: r["category"])
     total_size = sum(r["size"] for r in results)
