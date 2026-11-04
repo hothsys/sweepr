@@ -54,7 +54,7 @@ All responses are JSON unless noted.
 | GET | `/` | Serves `index.html` |
 | GET | `/static/...` | Static assets (HTML, CSS, JS) |
 | GET | `/favicon.ico` | Favicon (not JSON) |
-| GET | `/api/health` | Liveness check |
+| GET | `/api/health` | Liveness check, plus `started_at` and `restart_needed` (the server's Python files changed after it started; the UI then shows a restart banner) |
 | GET | `/api/apps` | Installed applications (cached) |
 | GET | `/api/apps/refresh` | Force a fresh application scan |
 | GET | `/api/apps/sizes` | Progressive size map; `complete` flag ends polling |

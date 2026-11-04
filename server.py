@@ -63,8 +63,27 @@ _STORAGE_CACHE_MAX = 256  # bound the drill cache in this long-running process
 
 MAX_BODY = 1024 * 1024  # largest POST body accepted
 
+
+def _code_mtime():
+    """Newest modification time of the server's Python code. A running server
+    keeps the code it started with, so if the files change afterwards (an update
+    was copied in) the UI says a restart is needed instead of silently running
+    the old version."""
+    newest = 0.0
+    for f in [BASE_DIR / "server.py"] + list((BASE_DIR / "lib").glob("*.py")):
+        try:
+            newest = max(newest, f.stat().st_mtime)
+        except OSError:
+            pass
+    return newest
+
+
+_STARTED_CODE_MTIME = _code_mtime()
+_STARTED_AT = time.time()
+
 # Polled endpoints are logged at DEBUG so they don't flood the log at INFO
-_QUIET_PATHS = ("/api/apps/sizes", "/api/storage/progress", "/api/brew/status", "/api/storage/roots")
+_QUIET_PATHS = ("/api/apps/sizes", "/api/storage/progress", "/api/brew/status", "/api/storage/roots",
+                "/api/health")
 
 # Bumped whenever a cache is invalidated or a rescan starts; background work
 # started under an older generation discards its results instead of
@@ -480,7 +499,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                 log.debug("  → init styles: %s", fname)
             self._serve_file(BASE_DIR / path.lstrip("/"))
         elif path == "/api/health":
-            self._send_json({"status": "ok"})
+            restart_needed = _code_mtime() > _STARTED_CODE_MTIME
+            if restart_needed:
+                log.debug("GET /api/health: code changed since start, restart needed")
+            self._send_json({"status": "ok", "started_at": _STARTED_AT, "restart_needed": restart_needed})
         elif path == "/api/apps":
             apps = get_apps()
             log.info("GET /api/apps → %d apps", len(apps))
