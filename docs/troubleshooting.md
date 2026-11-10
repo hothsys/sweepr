@@ -15,7 +15,7 @@ Options:
 1. **Leave it (recommended).** These locations rarely hold removable orphans and are sensitive. The scan works fine without them.
 2. **Grant Full Disk Access:** System Settings, Privacy & Security, Full Disk Access, add your Python binary. Not recommended for a tool whose job is deleting files, since it widens what Sweepr can touch.
 
-## A fix "didn't work", or a yellow "Sweepr was updated" banner
+## A fix "didn't work", or a yellow "Sweepr has been updated" banner
 
 A running server keeps the Python code it started with. If Sweepr's files are updated (copied in, edited) while it runs, nothing changes until it restarts; the page notices (`restart_needed` from `/api/health`, checked on load and every minute) and shows a banner. Restart it: Ctrl+C in the terminal and `python3 server.py` again, or for the login item `launchctl kickstart -k gui/$UID/com.sweepr.server`, then reload the page. Changes to the HTML, CSS and JavaScript only need a page reload.
 

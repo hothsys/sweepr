@@ -867,3 +867,8 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
 }
+
+.restart-banner details { margin-top: 4px; }
+.restart-banner summary { cursor: pointer; color: var(--accent); width: fit-content; }
+.restart-banner ul { margin: 6px 0 0 18px; padding: 0; }
+.restart-banner li { margin: 2px 0; }

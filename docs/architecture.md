@@ -60,7 +60,7 @@ All responses are JSON unless noted.
 | GET | `/api/apps/sizes` | Progressive size map; `complete` flag ends polling |
 | GET | `/api/apps/{id}/icon` | PNG icon for an app (not JSON; cached by the browser for a day) |
 | GET | `/api/apps/{id}/files` | Associated files for an app |
-| GET | `/api/apps/{id}/running` | Whether the app is currently running |
+| GET | `/api/apps/{id}/running` | Whether the app's main program is running, and whether its bundle still `exists` (if not, the app list is invalidated) |
 | GET | `/api/brew` | Homebrew packages (quick list, then detailed) |
 | GET | `/api/brew/refresh` | Force a fresh Homebrew scan |
 | GET | `/api/brew/status` | Whether the detailed brew pass has finished, plus any `brew` error and a suggested fix command |
