@@ -13,12 +13,18 @@ async function fetchApps(refresh) {
   apps = data.apps || [];
   indexApps();
   // Keep the selection pointing at the fresh object so size updates reach it
+  const previous = selectedApp;
   if (selectedApp) selectedApp = apps.find(a => a.path === selectedApp.path) || null;
   if (gen === fetchGeneration && currentTab === 'apps') {
     renderAppList();
-    // Refresh also re-checks the app being viewed (its running state and files),
-    // which otherwise stayed as they were when it was first clicked
-    if (refresh && selectedApp) selectApp(appIdentifier(selectedApp));
+    if (previous && !selectedApp) {
+      // The app being viewed was removed outside Sweepr: don't leave its buttons up
+      renderUninstalled(previous);
+    } else if (refresh && selectedApp) {
+      // Refresh also re-checks the app being viewed (its running state and files),
+      // which otherwise stayed as they were when it was first clicked
+      selectApp(appIdentifier(selectedApp));
+    }
   }
   pollSizes();
   preloadOtherTabs();
@@ -142,6 +148,10 @@ function watchRunning(app) {
       try {
         const data = await fetchJson(`/api/apps/${encodeURIComponent(appIdentifier(app))}/running`);
         if (token !== _runningWatchGen || selectedApp !== app) return;
+        if (data.exists === false) {
+          appRemovedElsewhere(app);
+          return;
+        }
         if (!!data.running !== !!app._running) {
           app._running = data.running;
           updateRunningBadge(app);
@@ -153,6 +163,38 @@ function watchRunning(app) {
     _runningTimer = setTimeout(tick, RUNNING_POLL_MS);
   };
   _runningTimer = setTimeout(tick, RUNNING_POLL_MS);
+}
+
+// The app vanished while its page was open (its own uninstaller, Finder, another
+// tool). Drop it, say so, and point at the leftovers it usually leaves behind.
+function appRemovedElsewhere(app) {
+  apps = apps.filter(a => a !== app);
+  indexApps();
+  selectedApp = null;
+  associatedFiles = [];
+  if (currentTab === 'apps') {
+    renderAppList();
+    renderUninstalled(app);
+  }
+  showToast(`${app.name} was uninstalled`, 'success');
+}
+
+function renderUninstalled(app) {
+  detailPanel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-icon"><div class="fallback">&#10003;</div></div>
+      <div>
+        <div class="detail-title">${escHtml(app.name)}</div>
+        <div class="detail-version">No longer installed</div>
+        <div class="detail-dates">${escHtml(shortenPath(app.path))} is gone; it was removed outside Sweepr, for example by its own uninstaller.</div>
+      </div>
+    </div>
+    ${renderRiskBanner({ level: 'low', reason: 'Uninstallers often leave preferences and caches behind. They now show up in the Orphans tab, where you can review and remove them' })}
+    <div class="action-bar">
+      <div class="total-size"></div>
+      <button class="btn-refresh" onclick="switchTab('orphans')">Check Orphans for leftovers</button>
+    </div>
+  `;
 }
 
 function updateRunningBadge(app) {

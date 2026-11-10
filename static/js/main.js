@@ -33,9 +33,14 @@ async function checkForRestart() {
     const health = await fetchJson('/api/health');
     if (health.restart_needed && !document.getElementById('restartBanner')) {
       document.body.insertAdjacentHTML('afterbegin', `<div id="restartBanner" class="restart-banner">
-        Sweepr was updated after it started, so it's still running the previous version.
-        Restart it to apply the changes: press Ctrl+C where you started it and run <code>python3 server.py</code> again
-        (or, for the login item, <code>launchctl kickstart -k gui/$UID/com.sweepr.server</code>), then reload this page.
+        <strong>Sweepr has been updated.</strong> Restart it to start using the new version, then reload this page.
+        <details>
+          <summary>How do I restart it?</summary>
+          <ul>
+            <li><strong>Started from a terminal window:</strong> click that window, press Control-C, then run the same command again (<code>python3 server.py</code>).</li>
+            <li><strong>Runs automatically when you log in:</strong> log out and back in, or restart your Mac.</li>
+          </ul>
+        </details>
       </div>`);
     }
   } catch {}
