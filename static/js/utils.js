@@ -147,6 +147,7 @@ function getAppRisk(app) {
 
 function getBrewRisk(pkg) {
   const usedBy = pkg.used_by || [];
+  if (pkg.app_missing) return { level: 'low', reason: 'The app is already gone, but Homebrew still has it registered, so brew upgrade can reinstall it. Uninstall it here so Homebrew forgets it' };
   if (pkg.pinned) return { level: 'high', reason: 'This package is pinned. It was intentionally locked to this version' };
   if (usedBy.length) {
     const names = usedBy.slice(0, 3).join(', ') + (usedBy.length > 3 ? ` and ${usedBy.length - 3} more` : '');

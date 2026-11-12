@@ -19,7 +19,9 @@ from lib.scanner import scan_applications, calculate_dir_size
 from lib.icons import get_icon_png
 from lib.associated_files import find_associated_files
 from lib.trash import move_to_trash, check_app_running, is_safe_to_trash, quit_app, find_login_items, delete_login_items
-from lib.brew_scanner import scan_homebrew, scan_homebrew_quick, suggested_fix, uninstall_package as brew_uninstall
+from lib.brew_scanner import (scan_homebrew, scan_homebrew_quick, suggested_fix, cask_app_index,
+                              untap_if_unused, is_third_party_tap, uninstall_package as brew_uninstall)
+from lib.home_data import home_folders_for_app, external_command
 from lib.npm_scanner import scan_npm_globals, PROTECTED_PACKAGES as NPM_PROTECTED, uninstall_package as npm_uninstall
 from lib.orphan_scanner import scan_orphans
 from lib.launchagent_scanner import scan_launch_agents, unload_agent
@@ -97,6 +99,7 @@ _offered_lock = threading.Lock()
 _offered_orphans = set()
 _offered_agents = {}  # plist path -> agent dict
 _offered_files = {}   # app path -> set of associated file paths
+_offered_brew_leftovers = set()  # home folders found after a Homebrew uninstall
 
 
 def _compute_sizes_background(apps, gen):
@@ -232,6 +235,17 @@ def get_apps(force_refresh=False):
         if _apps_cache is None or force_refresh:
             log.info("get_apps: cache miss, scanning%s", " (forced)" if force_refresh else "")
             _apps_cache = scan_applications()
+            # Apps a Homebrew cask installed: trashing them leaves the cask registered,
+            # and the next `brew upgrade` puts them back
+            casks = cask_app_index()
+            with _brew_lock:  # the detailed pass knows apps some older metadata doesn't list
+                for p in _brew_cache or []:
+                    for app_name in p.get("apps") or [] if p["type"] == "cask" else []:
+                        casks.setdefault(app_name, p["name"])
+            for a in _apps_cache:
+                token = casks.get(os.path.basename(a["path"]))
+                if token and os.path.dirname(a["path"]) in ("/Applications", str(Path.home() / "Applications")):
+                    a["brew_cask"] = token
             _start_size_computation(_apps_cache)
         else:
             system = sum(1 for a in _apps_cache if a.get("is_system"))
@@ -600,6 +614,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif path.startswith("/api/apps/") and path.endswith("/launch-uninstaller"):
             identifier = path[len("/api/apps/"):-len("/launch-uninstaller")]
             self._handle_launch_uninstaller(identifier)
+        elif path == "/api/brew/leftovers/trash":
+            self._handle_brew_leftovers_trash()
         elif path.startswith("/api/brew/") and path.endswith("/uninstall"):
             pkg_name = path[len("/api/brew/"):-len("/uninstall")]
             self._handle_brew_uninstall(pkg_name)
@@ -653,11 +669,19 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _handle_running(self, identifier):
         app = find_app(identifier)
         if not app:
-            self._send_json({"running": False})
+            self._send_json({"running": False, "exists": False})
+            return
+        # exists lets the UI notice an app removed outside Sweepr (its own
+        # uninstaller, Finder) while its detail page is open
+        exists = os.path.lexists(app["path"])
+        if not exists:
+            log.info("_handle_running: '%s' no longer exists at %s, dropping the app list", app["name"], app["path"])
+            _invalidate_apps()
+            self._send_json({"running": False, "exists": False})
             return
         running = check_app_running(app["path"])
         log.debug("_handle_running: '%s' is %s", app["name"], "running" if running else "not running")
-        self._send_json({"running": running})
+        self._send_json({"running": running, "exists": True})
 
     def _handle_trash(self, identifier):
         app = find_app(identifier)
@@ -672,6 +696,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         if app.get("is_self"):
             log.warning("_handle_trash: blocked, Sweepr's own launcher '%s'", app["path"])
             self._send_error(403, "Sweepr can't remove itself; run launchagent/uninstall.sh")
+            return
+        if app.get("brew_cask") and self._body.get("include_app", True):
+            # Trashing it would leave the cask registered; `brew upgrade` reinstalls it
+            log.warning("_handle_trash: blocked, '%s' is managed by Homebrew cask %s", app["name"], app["brew_cask"])
+            self._send_error(409, f"{app['name']} was installed with Homebrew. Uninstall it with Homebrew "
+                                  f"(cask {app['brew_cask']}) so it isn't reinstalled by brew upgrade.")
             return
 
         data = self._body
@@ -788,24 +818,73 @@ class RequestHandler(BaseHTTPRequestHandler):
         if pkg_type not in ("formula", "cask"):
             self._send_error(400, "type must be formula or cask")
             return
+        zap = self._body.get("zap", False) is True and pkg_type == "cask"
+        untap = self._body.get("untap") is True
         # Only packages the scan listed; this also keeps option-like names
         # ("--force") from ever reaching brew's argument list
         with _brew_lock:
-            listed = any(p["name"] == pkg_name and p["type"] == pkg_type for p in (_brew_cache or []))
-        if not listed:
+            pkg = next((p for p in (_brew_cache or []) if p["name"] == pkg_name and p["type"] == pkg_type), None)
+        if not pkg:
             log.warning("_handle_brew_uninstall: rejected %s (%s), not in the scanned list", pkg_name, pkg_type)
             self._send_error(403, "Package is not in the scanned Homebrew list")
             return
-        log.info("_handle_brew_uninstall: uninstalling %s (%s)", pkg_name, pkg_type)
-        result = brew_uninstall(pkg_name, pkg_type)
+        if pkg_type == "cask":
+            # Same reason as app removal: an app deleted while running keeps going
+            for app_name in pkg.get("apps") or []:
+                app_path = os.path.join("/Applications", app_name)
+                if os.path.exists(app_path):
+                    quit_info = quit_app(app_path)
+                    if not quit_info["ok"]:
+                        self._send_error(409, quit_info["error"])
+                        return
+        log.info("_handle_brew_uninstall: uninstalling %s (%s, zap=%s, untap=%s)", pkg_name, pkg_type, zap, untap)
+        result = brew_uninstall(pkg_name, pkg_type, zap=zap)
         _invalidate_brew()
-
-        if result["success"]:
-            log.info("_handle_brew_uninstall: success for %s", pkg_name)
-            self._send_json(result)
-        else:
+        if not result["success"]:
             log.error("_handle_brew_uninstall: failed for %s: %s", pkg_name, result["error"])
             self._send_error(500, result["error"])
+            return
+        log.info("_handle_brew_uninstall: success for %s", pkg_name)
+
+        tap = pkg.get("tap")
+        result["tap"] = tap
+        if untap and is_third_party_tap(tap):
+            result["untapped"], result["untap_note"] = untap_if_unused(tap)
+        # Data the package kept in the home folder (~/.anylinuxfs), unless another
+        # install of the same command still uses it
+        leftovers = []
+        for path, commands in home_folders_for_app(pkg_name):
+            if external_command(commands):
+                continue
+            size, _ = disk_usage(path)
+            leftovers.append({"path": path, "size": size})
+        with _offered_lock:
+            _offered_brew_leftovers.update(l["path"] for l in leftovers)
+        if leftovers:
+            log.info("_handle_brew_uninstall: leftovers for %s: %s", pkg_name, [l["path"] for l in leftovers])
+        result["leftovers"] = leftovers
+        # The app (for casks) is gone; make the Apps tab rescan
+        if pkg_type == "cask":
+            _invalidate_apps()
+        self._send_json(result)
+
+    def _handle_brew_leftovers_trash(self):
+        paths = _str_list(self._body.get("paths"))
+        if not paths:
+            self._send_error(400, "paths must be a non-empty list of strings")
+            return
+        with _offered_lock:
+            unknown = [p for p in paths if p not in _offered_brew_leftovers]
+        if unknown:
+            log.warning("_handle_brew_leftovers_trash: rejected paths not offered: %s", unknown[:5])
+            self._send_error(403, "Request includes paths that weren't offered as leftovers")
+            return
+        result = _trash(paths)
+        with _offered_lock:
+            _offered_brew_leftovers.difference_update(result["success"])
+        log.info("_handle_brew_leftovers_trash: %d succeeded, %d failed",
+                 len(result["success"]), len(result["failed"]))
+        self._send_json(result)
 
     def _handle_npm_uninstall(self, pkg_name):
         if pkg_name in NPM_PROTECTED:

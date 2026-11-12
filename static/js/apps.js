@@ -179,14 +179,16 @@ function appRemovedElsewhere(app) {
   showToast(`${app.name} was uninstalled`, 'success');
 }
 
-function renderUninstalled(app) {
+function renderUninstalled(app, viaHomebrew) {
   detailPanel.innerHTML = `
     <div class="detail-header">
       <div class="detail-icon"><div class="fallback">&#10003;</div></div>
       <div>
         <div class="detail-title">${escHtml(app.name)}</div>
         <div class="detail-version">No longer installed</div>
-        <div class="detail-dates">${escHtml(shortenPath(app.path))} is gone; it was removed outside Sweepr, for example by its own uninstaller.</div>
+        <div class="detail-dates">${viaHomebrew
+          ? `Uninstalled with Homebrew (cask ${escHtml(app.brew_cask)}), so <code>brew upgrade</code> won't bring it back.`
+          : `${escHtml(shortenPath(app.path))} is gone; it was removed outside Sweepr, for example by its own uninstaller.`}</div>
       </div>
     </div>
     ${renderRiskBanner({ level: 'low', reason: 'Uninstallers often leave preferences and caches behind. They now show up in the Orphans tab, where you can review and remove them' })}
@@ -358,12 +360,15 @@ function renderDetail() {
       </div>
       <button class="btn-official-uninstaller" onclick="launchUninstaller()">Run Uninstaller</button>
     </div>` : ''}
+    ${app.brew_cask ? `<p class="modal-note">Installed with Homebrew (cask <strong>${escHtml(app.brew_cask)}</strong>). Uninstall it with Homebrew: moving it to the Trash would leave Homebrew thinking it's installed, and <code>brew upgrade</code> would bring it back.</p>` : ''}
     ${renderRiskBanner(getAppRisk(app))}
     <div class="action-bar">
       <div class="total-size">Total to remove: <span>${formatBytes(app.size + totalSelected)}</span></div>
-      <button class="btn-trash" ${canTrash ? '' : 'disabled'} onclick="confirmTrash()">
+      ${app.brew_cask
+        ? `<button class="btn-trash" ${canTrash ? '' : 'disabled'} onclick="confirmBrewAppUninstall()">Uninstall with Homebrew</button>`
+        : `<button class="btn-trash" ${canTrash ? '' : 'disabled'} onclick="confirmTrash()">
         ${app.is_system ? 'System App' : app.is_self ? 'Use uninstall.sh' : 'Move to Trash'}
-      </button>
+      </button>`}
     </div>
   `;
 
@@ -408,6 +413,56 @@ function confirmTrash() {
         <button class="btn-confirm" onclick="doTrash()">Move to Trash</button>
       </div>
   `);
+}
+
+// ── Apps installed by a Homebrew cask ──
+
+function brewPackageForApp(app) {
+  return brewPackages.find(p => p.type === 'cask' && p.name === app.brew_cask)
+    || { name: app.brew_cask, type: 'cask', tap: null };
+}
+
+function confirmBrewAppUninstall() {
+  const app = selectedApp;
+  if (!app || !app.brew_cask) return;
+  const pkg = brewPackageForApp(app);
+  const running = app._running
+    ? `<strong>${escHtml(app.name)}</strong> is running. Sweepr will quit it first, so save any open work now.<br><br>` : '';
+  openModal(`
+      <h3>Uninstall ${escHtml(app.name)} with Homebrew?</h3>
+      <p>${running}This runs <strong>brew uninstall --cask ${escHtml(app.brew_cask)}</strong>, which removes the app and makes Homebrew forget it. Then <strong>brew autoremove</strong> removes dependencies nothing needs any more.</p>
+      ${brewUninstallOptions(pkg)}
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn-confirm" onclick="doBrewAppUninstall()">Uninstall</button>
+      </div>
+  `);
+}
+
+async function doBrewAppUninstall() {
+  const options = readBrewUninstallOptions();
+  document.querySelector('.modal-overlay')?.remove();
+  const app = selectedApp;
+  if (!app || !app.brew_cask) return;
+  isRemoving = true;
+  const btn = detailPanel.querySelector('.btn-trash');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Uninstalling...'; }
+  try {
+    await runBrewUninstall(app.brew_cask, 'cask', options);
+    apps = apps.filter(a => a !== app);
+    indexApps();
+    if (selectedApp === app) {
+      selectedApp = null;
+      associatedFiles = [];
+      if (currentTab === 'apps') renderUninstalled(app, true);
+    }
+    if (currentTab === 'apps') renderAppList();
+    _brewPromise = null;  // the Homebrew tab's list is out of date now
+  } catch (e) {
+    showToast(`Uninstall failed: ${e.message}`, 'error');
+    if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Uninstall with Homebrew'; }
+  }
+  isRemoving = false;
 }
 
 function getSelectedFiles() {
