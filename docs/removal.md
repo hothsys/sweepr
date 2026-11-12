@@ -28,6 +28,10 @@ Symlinks never go to Finder. Its `as alias` coercion follows the link: it fails 
 
 A zero exit code from `osascript` isn't taken as proof. When Finder's privileged delete is denied (its own authentication prompt is cancelled, or a privilege-management agent intercepts it), Finder can still copy the item into the Trash and report success while the original stays put. So Sweepr checks that the source path is actually gone, and if it isn't, reports the path as failed ("Removal was cancelled or requires administrator privileges").
 
+## Apps installed with Homebrew
+
+An app a Homebrew cask installed is marked `brew_cask` and is removed with **Uninstall with Homebrew** (`brew uninstall --cask`, optionally `--zap`) instead of a Trash move. A plain trash request for it is refused with 409: the cask would stay registered and `brew upgrade` would reinstall the app. See [Homebrew and npm](homebrew-and-npm.md).
+
 ## Running apps
 
 A running app keeps going from memory after its bundle is deleted, even after the Trash is emptied, and it can recreate the support files that were just removed. (Cheat Sheet kept answering a long press of Command with a blank overlay this way.) So before trashing an app, `_handle_trash` stops it with `quit_app()` in `lib/trash.py`:

@@ -872,3 +872,15 @@ body {
 .restart-banner summary { cursor: pointer; color: var(--accent); width: fit-content; }
 .restart-banner ul { margin: 6px 0 0 18px; padding: 0; }
 .restart-banner li { margin: 2px 0; }
+
+/* Checkbox options inside confirmation dialogs */
+.modal-option {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+.modal-option input { margin-top: 2px; }

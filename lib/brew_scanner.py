@@ -32,6 +32,9 @@ def scan_homebrew_quick():
             versions = [v for v in os.listdir(cask_dir) if not v.startswith(".")]
             if versions:
                 pkg["version"] = max(versions, key=_version_key)
+            meta = _cask_metadata(caskroom, name)
+            pkg["apps"] = meta["apps"]
+            pkg["has_zap"] = meta["has_zap"]
             packages.append(pkg)
             cask_count += 1
     except OSError as e:
@@ -42,6 +45,57 @@ def scan_homebrew_quick():
     log.info("scan_homebrew_quick: complete — %d formulae, %d casks in %.2fs",
              len(packages) - cask_count, cask_count, time.time() - t0)
     return packages
+
+
+def _cask_metadata(caskroom, token):
+    """The app bundles a cask installed and whether it defines a zap (Homebrew's
+    curated list of the app's settings and data), from the newest
+    Caskroom/<token>/.metadata/<version>/<timestamp>/Casks/<token>.json."""
+    result = {"apps": [], "has_zap": False}
+    meta_root = os.path.join(caskroom, token, ".metadata")
+    try:
+        candidates = []
+        for version in os.listdir(meta_root):
+            vdir = os.path.join(meta_root, version)
+            for stamp in os.listdir(vdir) if os.path.isdir(vdir) else []:
+                f = os.path.join(vdir, stamp, "Casks", token + ".json")
+                if os.path.isfile(f):
+                    candidates.append(f)
+        if not candidates:
+            return result
+        with open(max(candidates, key=os.path.getmtime)) as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        log.debug("_cask_metadata: none for %s: %s", token, e)
+        return result
+    for artifact in data.get("artifacts") or []:
+        if not isinstance(artifact, dict):
+            continue
+        for app in artifact.get("app") or []:
+            # entries are "Name.app" or {"target": ...} / ["Name.app", {"target": "Other.app"}]
+            if isinstance(app, str) and app.endswith(".app"):
+                result["apps"].append(os.path.basename(app))
+            elif isinstance(app, dict) and str(app.get("target", "")).endswith(".app"):
+                result["apps"][-1:] = [os.path.basename(app["target"])]
+        if artifact.get("zap"):
+            result["has_zap"] = True
+    return result
+
+
+def cask_app_index():
+    """{app bundle file name: cask token} for every installed cask, so the Apps
+    tab can tell which apps Homebrew manages."""
+    cellar = _get_cellar_path()
+    caskroom = os.path.join(os.path.dirname(cellar), "Caskroom") if cellar else ""
+    index = {}
+    try:
+        tokens = [t for t in os.listdir(caskroom) if not t.startswith(".")] if caskroom else []
+    except OSError:
+        return index
+    for token in tokens:
+        for app in _cask_metadata(caskroom, token)["apps"]:
+            index[app] = token
+    return index
 
 
 def _blank_package(name, pkg_type):
@@ -95,11 +149,12 @@ def _local_formula_info(cellar):
             continue
         version = _active_keg_version(cellar, name, versions)
         entry = {"version": version, "installed_on_request": None, "installed_at": None,
-                 "runtime_deps": [], "used_by": []}
+                 "runtime_deps": [], "used_by": [], "tap": None}
         try:
             with open(os.path.join(keg_root, version, "INSTALL_RECEIPT.json")) as f:
                 receipt = json.load(f)
             entry["installed_on_request"] = bool(receipt.get("installed_on_request"))
+            entry["tap"] = (receipt.get("source") or {}).get("tap")
             entry["installed_at"] = _format_timestamp(receipt.get("time"))
             entry["runtime_deps"] = [d.get("full_name", "").split("/")[-1]
                                      for d in receipt.get("runtime_dependencies") or []]
@@ -131,8 +186,13 @@ def _annotate_from_receipts(packages, info, fill_basics=False):
     which has no brew info data) also take version, install date and
     installed_on_request from the receipt; None means it couldn't be determined."""
     services = _registered_services()
+    app_dirs = ("/Applications", os.path.expanduser("~/Applications"))
     for pkg in packages:
         pkg["used_by"] = []
+        if pkg["type"] == "cask" and pkg.get("apps"):
+            # Removed by dragging to the Trash: Homebrew still lists the cask, and
+            # `brew upgrade` reinstalls the app when a new version comes out
+            pkg["app_missing"] = not any(os.path.exists(os.path.join(d, a)) for d in app_dirs for a in pkg["apps"])
         # brew services only manages formulae
         pkg["service"] = pkg["type"] == "formula" and pkg["name"] in services
         if pkg["type"] != "formula":
@@ -140,6 +200,8 @@ def _annotate_from_receipts(packages, info, fill_basics=False):
         entry = info.get(pkg.get("keg_name") or pkg["name"])
         if entry:
             pkg["used_by"] = sorted(entry["used_by"])
+        if entry and not pkg.get("tap"):
+            pkg["tap"] = entry["tap"]
         if fill_basics:
             pkg["version"] = entry["version"] if entry else ""
             pkg["installed_at"] = entry["installed_at"] if entry else None
@@ -201,7 +263,6 @@ def scan_homebrew():
             if pkg.get("_cellar_path"):
                 size_paths.append(pkg["_cellar_path"])
 
-    _annotate_from_receipts(packages, _local_formula_info(cellar))
     sizes = _batch_dir_sizes(size_paths)
     for pkg in packages:
         cp = pkg.pop("_cellar_path", None)
@@ -215,6 +276,8 @@ def scan_homebrew():
             packages.append(pkg)
             cask_count += 1
 
+    # After the casks are added, so they get service/used_by/app_missing too
+    _annotate_from_receipts(packages, _local_formula_info(cellar))
     packages.sort(key=lambda p: p["name"].lower())
     log.info("scan_homebrew: complete — %d formulae, %d casks in %.2fs",
              len(packages) - cask_count, cask_count, time.time() - t0)
@@ -274,6 +337,7 @@ def _parse_formula(f, cellar):
     return {
         "name": f["name"],
         "keg_name": keg_name,
+        "tap": f.get("tap"),
         "version": version,
         "description": f.get("desc", ""),
         "type": "formula",
@@ -291,6 +355,10 @@ def _parse_cask(c):
     timestamp = c.get("installed_time", 0)
     return {
         "name": c.get("token", ""),
+        "tap": c.get("tap"),
+        "has_zap": any(isinstance(a, dict) and a.get("zap") for a in c.get("artifacts") or []),
+        "apps": [os.path.basename(x) for a in c.get("artifacts") or [] if isinstance(a, dict)
+                 for x in (a.get("app") or []) if isinstance(x, str) and x.endswith(".app")],
         "version": c.get("installed", ""),
         "description": c.get("desc", ""),
         "type": "cask",
@@ -312,7 +380,45 @@ def _format_timestamp(ts):
         return None
 
 
-def uninstall_package(name, pkg_type):
+# Taps that ship with Homebrew; never removed
+CORE_TAPS = {"homebrew/core", "homebrew/cask", "homebrew/services", "homebrew/bundle",
+             "homebrew/cask-fonts", "homebrew/cask-versions"}
+
+
+def is_third_party_tap(tap):
+    return bool(tap) and tap.lower() not in CORE_TAPS
+
+
+def untap_if_unused(tap):
+    """`brew untap` a third-party tap once nothing installed comes from it. A tap
+    left behind keeps getting updated and its packages can come back.
+    Returns (untapped, message)."""
+    if not is_third_party_tap(tap):
+        return False, f"{tap} ships with Homebrew"
+    try:
+        listed = subprocess.run(["brew", "list", "--full-name"], capture_output=True, text=True,
+                                timeout=60, stdin=subprocess.DEVNULL, env=_BREW_ENV)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log.warning("untap_if_unused: brew list failed: %s", e)
+        return False, "couldn't check what else uses the tap"
+    still = [n for n in listed.stdout.split() if n.lower().startswith(tap.lower() + "/")]
+    if still:
+        log.info("untap_if_unused: keeping %s, still used by %s", tap, still)
+        return False, f"{tap} is still used by {', '.join(s.split('/')[-1] for s in still)}"
+    try:
+        r = subprocess.run(["brew", "untap", tap], capture_output=True, text=True,
+                           timeout=120, stdin=subprocess.DEVNULL, env=_BREW_ENV)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log.warning("untap_if_unused: brew untap %s failed: %s", tap, e)
+        return False, f"brew untap {tap} failed"
+    if r.returncode != 0:
+        log.warning("untap_if_unused: brew untap %s exited %d: %s", tap, r.returncode, r.stderr.strip())
+        return False, r.stderr.strip() or f"brew untap {tap} failed"
+    log.info("untap_if_unused: untapped %s", tap)
+    return True, ""
+
+
+def uninstall_package(name, pkg_type, zap=False):
     if not name or not _is_safe_name(name):
         log.warning("uninstall_package: rejected invalid name %r", name)
         return {"success": False, "error": "Invalid package name"}
@@ -322,6 +428,9 @@ def uninstall_package(name, pkg_type):
         cmd = ["brew", "uninstall"]
         if pkg_type == "cask":
             cmd.append("--cask")
+            if zap:
+                # Homebrew's own list of the app's settings, caches and data
+                cmd.append("--zap")
         cmd.append(name)
         # Large casks with uninstall scripts can take minutes; killing brew midway
         # leaves a half-removed package. stdin is closed so a sudo prompt fails

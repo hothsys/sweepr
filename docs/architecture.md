@@ -75,7 +75,8 @@ All responses are JSON unless noted.
 | POST | `/api/apps/{id}/trash` | Quit the app if running, then move it plus selected associated files to Trash and remove its Login Items (files must come from `/api/apps/{id}/files`) |
 | POST | `/api/apps/{id}/reveal` | Reveal an app in Finder |
 | POST | `/api/apps/{id}/launch-uninstaller` | Launch an app's bundled uninstaller |
-| POST | `/api/brew/{name}/uninstall` | `brew uninstall` plus `brew autoremove` (package must be in the scanned list) |
+| POST | `/api/brew/{name}/uninstall` | `brew uninstall` plus `brew autoremove` (package must be in the scanned list); optional `zap` (casks) and `untap`; returns `tap`, `untapped`, `autoremoved` and home-folder `leftovers` |
+| POST | `/api/brew/leftovers/trash` | Move leftovers offered by the last uninstall to the Trash |
 | POST | `/api/npm/{name}/uninstall` | `npm uninstall -g` (package must be in the scanned list; `npm` and `corepack` are refused) |
 | POST | `/api/agents/trash` | Move a launch agent's plist to Trash, then unload the job with `launchctl bootout` (paths must come from `/api/agents`) |
 | POST | `/api/orphans/trash` | Move selected orphan paths to Trash (paths must come from `/api/orphans`) |
