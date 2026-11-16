@@ -1,3 +1,4 @@
+import contextlib
 import os
 import plistlib
 import re
@@ -16,8 +17,22 @@ _NOT_LOADED_CODES = (3, 113)
 
 # Programs that run a script named in their arguments; for these the script is
 # what has to exist, not the interpreter (which always does)
-INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "perl", "ruby", "node",
-                "osascript", "python", "python3", "python2"}
+INTERPRETERS = {
+    "sh",
+    "bash",
+    "zsh",
+    "dash",
+    "ksh",
+    "csh",
+    "tcsh",
+    "perl",
+    "ruby",
+    "node",
+    "osascript",
+    "python",
+    "python3",
+    "python2",
+}
 _PYTHON_RE = re.compile(r"^python\d+(\.\d+)*$")
 
 SCAN_DIRS = [
@@ -50,7 +65,9 @@ def scan_launch_agents():
 
     stale = sum(1 for a in agents if a["stale"])
     failing = sum(1 for a in agents if a.get("failing"))
-    log.info("scan_launch_agents: found %d agents (%d stale, %d failing)", len(agents), stale, failing)
+    log.info(
+        "scan_launch_agents: found %d agents (%d stale, %d failing)", len(agents), stale, failing
+    )
     return agents
 
 
@@ -64,8 +81,9 @@ def _launchd_status():
     status = {}
     for domain in ("system", f"gui/{os.getuid()}"):
         try:
-            out = subprocess.run(["launchctl", "print", domain], capture_output=True,
-                                 text=True, timeout=10).stdout
+            out = subprocess.run(
+                ["launchctl", "print", domain], capture_output=True, text=True, timeout=10
+            ).stdout
         except (OSError, subprocess.TimeoutExpired) as e:
             log.warning("_launchd_status: launchctl print %s failed: %s", domain, e)
             continue
@@ -81,10 +99,8 @@ def _launchd_status():
                 parts = stripped.split(None, 2)
                 if len(parts) == 3:
                     pid, code, label = parts
-                    try:
+                    with contextlib.suppress(ValueError):
                         status[(domain, label)] = (int(pid), None if code == "-" else int(code))
-                    except ValueError:
-                        pass
     return status
 
 
@@ -96,7 +112,9 @@ def _apply_status(agent, status):
     # Loaded, not running, and its last run ended in an error: launchd keeps
     # retrying it (or it fails every time it's triggered). Signals (negative
     # codes) are how jobs are normally stopped, so they don't count.
-    agent["failing"] = bool(entry and agent["pid"] is None and entry[1] is not None and entry[1] > 0)
+    agent["failing"] = bool(
+        entry and agent["pid"] is None and entry[1] is not None and entry[1] > 0
+    )
 
 
 def _load_plist(plist_path):
@@ -111,8 +129,11 @@ def _load_plist(plist_path):
     except Exception as e:
         first_error = str(e)
     try:
-        result = subprocess.run(["plutil", "-convert", "xml1", "-o", "-", str(plist_path)],
-                                capture_output=True, timeout=5)
+        result = subprocess.run(
+            ["plutil", "-convert", "xml1", "-o", "-", str(plist_path)],
+            capture_output=True,
+            timeout=5,
+        )
         if result.returncode == 0:
             data = plistlib.loads(result.stdout)
             if isinstance(data, dict):
@@ -239,8 +260,9 @@ def unload_agent(label, scope):
     target = f"{domain}/{label}"
     log.info("unload_agent: launchctl bootout %s", target)
     try:
-        result = subprocess.run(["launchctl", "bootout", target],
-                                capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            ["launchctl", "bootout", target], capture_output=True, text=True, timeout=15
+        )
     except (OSError, subprocess.TimeoutExpired) as e:
         log.error("unload_agent: failed for %s: %s", target, e)
         return False, str(e)
