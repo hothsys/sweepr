@@ -5,9 +5,9 @@ import subprocess
 import time
 from pathlib import Path
 
+from lib import home_data
 from lib.log import log
 from lib.sizes import disk_usage, is_protected_container
-from lib import home_data
 
 HOME = Path.home()
 
@@ -42,7 +42,7 @@ SYSTEM_PREFIXES = (
     "group.is.workflow.",
     "org.swift.",
     "com.openssh.",
-    "edu.mit.Kerberos",      # macOS Kerberos configuration
+    "edu.mit.Kerberos",  # macOS Kerberos configuration
     "org.sparkle-project.",  # update framework shared by many apps
     # Default cache folders of libraries embedded in many apps; named after the
     # library, so they can't be tied to (or blamed on) any one app
@@ -56,10 +56,45 @@ SYSTEM_PREFIXES = (
 # Words that appear in many unrelated bundle ids; a match on one of these says
 # nothing about whether the entry's app is installed
 GENERIC_PARTS = {
-    "com", "org", "net", "io", "app", "apps", "mac", "macos", "osx", "desktop", "client",
-    "helper", "helpers", "agent", "daemon", "service", "services", "installer", "uninstaller",
-    "update", "updater", "launcher", "plugin", "extension", "widget", "server", "core", "main",
-    "default", "cache", "data", "user", "pro", "lite", "free", "beta", "the", "inc", "llc",
+    "com",
+    "org",
+    "net",
+    "io",
+    "app",
+    "apps",
+    "mac",
+    "macos",
+    "osx",
+    "desktop",
+    "client",
+    "helper",
+    "helpers",
+    "agent",
+    "daemon",
+    "service",
+    "services",
+    "installer",
+    "uninstaller",
+    "update",
+    "updater",
+    "launcher",
+    "plugin",
+    "extension",
+    "widget",
+    "server",
+    "core",
+    "main",
+    "default",
+    "cache",
+    "data",
+    "user",
+    "pro",
+    "lite",
+    "free",
+    "beta",
+    "the",
+    "inc",
+    "llc",
 }
 
 # Apps that tools keep outside the Applications folders, so the app scan never
@@ -69,19 +104,28 @@ TOOL_OWNED = {
     "org.webkit.playwright": HOME / "Library" / "Caches" / "ms-playwright",
 }
 
-LAUNCHD_PLIST_DIRS = (Path("/Library/LaunchDaemons"), Path("/Library/LaunchAgents"),
-                      HOME / "Library" / "LaunchAgents")
+LAUNCHD_PLIST_DIRS = (
+    Path("/Library/LaunchDaemons"),
+    Path("/Library/LaunchAgents"),
+    HOME / "Library" / "LaunchAgents",
+)
 
 SKIP_NAMES = {
-    ".DS_Store", ".localized", "CloudDocs",
-    "Spotlight", "AppleMediaServices",
+    ".DS_Store",
+    ".localized",
+    "CloudDocs",
+    "Spotlight",
+    "AppleMediaServices",
 }
 
 
 def scan_orphans(known_bundle_ids, known_app_names):
     t0 = time.time()
-    log.info("scan_orphans: starting (known_ids=%d, known_names=%d)",
-             len(known_bundle_ids), len(known_app_names))
+    log.info(
+        "scan_orphans: starting (known_ids=%d, known_names=%d)",
+        len(known_bundle_ids),
+        len(known_app_names),
+    )
     _spotlight_cache.clear()  # per scan: apps get installed and removed between scans
     _vendor_cache.clear()
     known_ids_lower = {bid.lower() for bid in known_bundle_ids if bid}
@@ -152,15 +196,17 @@ def scan_orphans(known_bundle_ids, known_app_names):
                 continue
 
             app_name = _derive_app_name(entry_id or name)
-            orphans.append({
-                "path": str(entry),
-                "category": category,
-                "size": size,
-                "is_directory": entry.is_dir(),
-                "likely_app": app_name,
-                "bundle_id": entry_id or name,
-                "protected": is_protected_container(entry),
-            })
+            orphans.append(
+                {
+                    "path": str(entry),
+                    "category": category,
+                    "size": size,
+                    "is_directory": entry.is_dir(),
+                    "likely_app": app_name,
+                    "bundle_id": entry_id or name,
+                    "protected": is_protected_container(entry),
+                }
+            )
 
     orphans += _home_orphans(known_names_lower)
 
@@ -174,7 +220,11 @@ def scan_orphans(known_bundle_ids, known_app_names):
             vendor_groups[vendor] = {"vendor": vendor, "apps": {}, "total_size": 0, "file_count": 0}
         app_name = o["likely_app"]
         if app_name not in vendor_groups[vendor]["apps"]:
-            vendor_groups[vendor]["apps"][app_name] = {"app_name": app_name, "files": [], "total_size": 0}
+            vendor_groups[vendor]["apps"][app_name] = {
+                "app_name": app_name,
+                "files": [],
+                "total_size": 0,
+            }
         vendor_groups[vendor]["apps"][app_name]["files"].append(o)
         vendor_groups[vendor]["apps"][app_name]["total_size"] += o["size"]
         vendor_groups[vendor]["total_size"] += o["size"]
@@ -186,8 +236,13 @@ def scan_orphans(known_bundle_ids, known_app_names):
         result.append(vg)
     result.sort(key=lambda g: g["total_size"], reverse=True)
     total_size = sum(g["total_size"] for g in result)
-    log.info("scan_orphans: complete — %d vendor groups, %d orphans, %.1f MB in %.2fs",
-             len(result), len(orphans), total_size / 1024 / 1024, time.time() - t0)
+    log.info(
+        "scan_orphans: complete — %d vendor groups, %d orphans, %.1f MB in %.2fs",
+        len(result),
+        len(orphans),
+        total_size / 1024 / 1024,
+        time.time() - t0,
+    )
     return result
 
 
@@ -202,7 +257,7 @@ def _installed_elsewhere(entry_id):
     bid = entry_id
     for suffix in (".plist", ".savedState"):
         if bid.endswith(suffix):
-            bid = bid[:-len(suffix)]
+            bid = bid[: -len(suffix)]
     parts = bid.split(".")
     # Down to three components: com.vendor alone would match any of the vendor's apps
     if any(_spotlight_has(".".join(parts[:n])) for n in range(len(parts), 2, -1)):
@@ -214,7 +269,9 @@ def _installed_elsewhere(entry_id):
     lower = bid.lower()
     for nested in _vendor_bundle_ids(".".join(parts[:2])):
         if lower == nested or lower.startswith(nested + "."):
-            log.info("_installed_elsewhere: %s is bundled inside an installed %s app", bid, parts[1])
+            log.info(
+                "_installed_elsewhere: %s is bundled inside an installed %s app", bid, parts[1]
+            )
             return True
     return False
 
@@ -230,7 +287,7 @@ def _vendor_bundle_ids(vendor):
     if key in _vendor_cache:
         return _vendor_cache[key]
     ids = set()
-    query = "kMDItemCFBundleIdentifier == '%s.*'c" % vendor.replace("\\", "").replace("'", "")
+    query = "kMDItemCFBundleIdentifier == '{}.*'c".format(vendor.replace("\\", "").replace("'", ""))
     try:
         out = subprocess.run(["mdfind", query], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -256,8 +313,12 @@ def _nested_ids(app_path, max_depth=7):
             except Exception:
                 pass
         # Frameworks and localizations never hold extensions; skip them to stay fast
-        dirnames[:] = [d for d in dirnames
-                       if not d.endswith((".framework", ".lproj", ".dylib")) and d not in ("_CodeSignature", "Headers")]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if not d.endswith((".framework", ".lproj", ".dylib"))
+            and d not in ("_CodeSignature", "Headers")
+        ]
         if dirpath.count(os.sep) - base >= max_depth:
             dirnames[:] = []
     return ids
@@ -267,7 +328,7 @@ def _spotlight_has(bid):
     key = bid.lower()
     if key in _spotlight_cache:
         return _spotlight_cache[key]
-    query = "kMDItemCFBundleIdentifier == '%s'c" % bid.replace("\\", "").replace("'", "")
+    query = "kMDItemCFBundleIdentifier == '{}'c".format(bid.replace("\\", "").replace("'", ""))
     try:
         out = subprocess.run(["mdfind", query], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -295,14 +356,14 @@ def _helpers_in_use():
                 continue
             # The plist's own name usually matches its helper; count it even if the
             # plist can't be parsed, so an unreadable plist never orphans its helper
-            names.add(plist_path.name[:-len(".plist")])
+            names.add(plist_path.name[: -len(".plist")])
             try:
                 with open(plist_path, "rb") as f:
                     plist = plistlib.load(f)
             except Exception:
                 continue
             args = plist.get("ProgramArguments") or []
-            for exe in [plist.get("Program")] + list(args[:1]):
+            for exe in [plist.get("Program"), *list(args[:1])]:
                 if isinstance(exe, str) and exe.startswith("/Library/PrivilegedHelperTools/"):
                     names.add(os.path.basename(exe))
             label = plist.get("Label")
@@ -321,7 +382,9 @@ def _home_orphans(known_names_lower):
             continue
         if home_data.external_command(tool["commands"]):
             continue
-        existing = [f for f in tool["folders"] if (HOME / f).is_dir() and not (HOME / f).is_symlink()]
+        existing = [
+            f for f in tool["folders"] if (HOME / f).is_dir() and not (HOME / f).is_symlink()
+        ]
         if not existing or home_data.app_bundle_exists_anywhere(tool["apps"]):
             continue
         for f in existing:
@@ -329,16 +392,38 @@ def _home_orphans(known_names_lower):
             size, complete = disk_usage(path)
             if size == 0 or not complete:
                 continue
-            found.append({"path": str(path), "category": "Home Folder", "size": size,
-                          "is_directory": True, "likely_app": tool["name"],
-                          "bundle_id": f, "vendor": tool["name"], "protected": False})
+            found.append(
+                {
+                    "path": str(path),
+                    "category": "Home Folder",
+                    "size": size,
+                    "is_directory": True,
+                    "likely_app": tool["name"],
+                    "bundle_id": f,
+                    "vendor": tool["name"],
+                    "protected": False,
+                }
+            )
     for link, app_path in home_data.dangling_app_links():
-        app = os.path.basename(app_path)[:-len(".app")]
-        found.append({"path": link, "category": "Command-line Tools", "size": 0,
-                      "is_directory": False, "likely_app": app, "bundle_id": os.path.basename(link),
-                      "vendor": app, "protected": False})
+        app = os.path.basename(app_path)[: -len(".app")]
+        found.append(
+            {
+                "path": link,
+                "category": "Command-line Tools",
+                "size": 0,
+                "is_directory": False,
+                "likely_app": app,
+                "bundle_id": os.path.basename(link),
+                "vendor": app,
+                "protected": False,
+            }
+        )
     if found:
-        log.info("_home_orphans: %d item(s) outside ~/Library: %s", len(found), [o["path"] for o in found])
+        log.info(
+            "_home_orphans: %d item(s) outside ~/Library: %s",
+            len(found),
+            [o["path"] for o in found],
+        )
     return found
 
 
@@ -357,7 +442,7 @@ def _clean_name(name):
     stem = name
     for suffix in (".plist", ".savedState", ".app"):
         if stem.endswith(suffix):
-            stem = stem[:-len(suffix)]
+            stem = stem[: -len(suffix)]
     return stem.lower()
 
 
@@ -409,7 +494,6 @@ KNOWN_VENDORS = {
     "epic": "Epic Games",
     "ubf8t346g9": "Microsoft",
     "wondershare": "Wondershare",
-    "synology": "Synology",
 }
 
 
@@ -417,7 +501,7 @@ def _extract_vendor(identifier):
     name = identifier.lower()
     for suffix in (".plist", ".savedState"):
         if name.endswith(suffix):
-            name = name[:-(len(suffix))]
+            name = name[: -(len(suffix))]
     parts = name.split(".")
     # Check bundle ID parts against known vendors
     for part in parts:
@@ -441,12 +525,12 @@ def _derive_app_name(identifier):
     name = identifier
     for suffix in (".plist", ".savedState"):
         if name.endswith(suffix):
-            name = name[:-len(suffix)]
+            name = name[: -len(suffix)]
     parts = name.split(".")
     if len(parts) >= 3:
         app_part = parts[-1]
         org_part = parts[-2] if len(parts) > 2 else ""
-        app_part = re.sub(r'([a-z])([A-Z])', r'\1 \2', app_part)
+        app_part = re.sub(r"([a-z])([A-Z])", r"\1 \2", app_part)
         if org_part and org_part.lower() not in ("com", "org", "net", "io", "app", "mac", "macos"):
             org_part = org_part.capitalize()
             return f"{org_part} {app_part}"
