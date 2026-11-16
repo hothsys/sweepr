@@ -3,9 +3,9 @@ import subprocess
 import time
 from pathlib import Path
 
+from lib.home_data import cli_links_into, external_command, home_folders_for_app
 from lib.log import log
 from lib.sizes import disk_usage, is_protected_container
-from lib.home_data import home_folders_for_app, external_command, cli_links_into
 
 HOME = Path.home()
 
@@ -33,9 +33,30 @@ SEARCH_LOCATIONS = [
 # Bundle-id tails too generic to match on alone ("com.foo.mac" would claim
 # everything starting with "mac-")
 GENERIC_TAILS = {
-    "app", "mac", "macos", "osx", "desktop", "client", "helper", "launcher", "agent",
-    "daemon", "console", "media", "update", "updater", "service", "main", "core",
-    "beta", "electron", "installer", "uninstaller", "player", "viewer", "editor",
+    "app",
+    "mac",
+    "macos",
+    "osx",
+    "desktop",
+    "client",
+    "helper",
+    "launcher",
+    "agent",
+    "daemon",
+    "console",
+    "media",
+    "update",
+    "updater",
+    "service",
+    "main",
+    "core",
+    "beta",
+    "electron",
+    "installer",
+    "uninstaller",
+    "player",
+    "viewer",
+    "editor",
 }
 MIN_TAIL_LEN = 5
 
@@ -44,19 +65,26 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
     """other_apps: the rest of the installed apps (dicts with bundle_id, name, path),
     used to avoid offering another app's data or the other app itself."""
     t0 = time.time()
-    log.info("find_associated_files: searching for '%s' (bundle_id=%s)", app_name, bundle_id or "none")
+    log.info(
+        "find_associated_files: searching for '%s' (bundle_id=%s)", app_name, bundle_id or "none"
+    )
     results = []
     seen_paths = set()
     app_path_resolved = str(Path(app_path).resolve())
     other_app_paths = [str(Path(a["path"]).resolve()) for a in other_apps if a.get("path")]
     # Other apps' ids that are more specific than ours (com.x.DiskDrill.Media vs
     # com.x.DiskDrill): anything matching them is theirs, not ours
-    more_specific_ids = [a["bundle_id"].lower() for a in other_apps
-                         if bundle_id and a.get("bundle_id")
-                         and a["bundle_id"].lower().startswith(bundle_id.lower() + ".")]
+    more_specific_ids = [
+        a["bundle_id"].lower()
+        for a in other_apps
+        if bundle_id
+        and a.get("bundle_id")
+        and a["bundle_id"].lower().startswith(bundle_id.lower() + ".")
+    ]
     # Other apps sharing our exact bundle id (Photoshop 2025 and 2026)
-    sharing_apps = sorted({a["name"] for a in other_apps
-                           if bundle_id and a.get("bundle_id") == bundle_id})
+    sharing_apps = sorted(
+        {a["name"] for a in other_apps if bundle_id and a.get("bundle_id") == bundle_id}
+    )
 
     patterns = _build_patterns(bundle_id, app_name)
     log.debug("find_associated_files: patterns = %s", patterns)
@@ -67,7 +95,11 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
         try:
             entries = list(search_dir.iterdir())
         except PermissionError:
-            log.debug("find_associated_files: permission denied for %s (%s) — requires Full Disk Access", category, search_dir)
+            log.debug(
+                "find_associated_files: permission denied for %s (%s) — requires Full Disk Access",
+                category,
+                search_dir,
+            )
             continue
         for entry in entries:
             entry_name = entry.name
@@ -86,7 +118,9 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
                 continue
             lower = entry_name.lower()
             if any(lower == oid or lower.startswith(oid + ".") for oid in more_specific_ids):
-                log.debug("find_associated_files: %s belongs to a more specific installed app", entry_name)
+                log.debug(
+                    "find_associated_files: %s belongs to a more specific installed app", entry_name
+                )
                 continue
             real = str(entry.resolve())
             if real == app_path_resolved or real in seen_paths:
@@ -102,7 +136,9 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
             # mdfind returns every bundle with this id: other copies or versions of
             # the app, or an app nested in another product. Never offer an app.
             if fpath.endswith(".app") or ".app/" in fpath:
-                log.debug("find_associated_files: skipping Spotlight hit inside an app bundle: %s", fpath)
+                log.debug(
+                    "find_associated_files: skipping Spotlight hit inside an app bundle: %s", fpath
+                )
                 continue
             if any(fpath == op or fpath.startswith(op + "/") for op in other_app_paths):
                 continue
@@ -121,7 +157,7 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
         other = external_command(commands, app_path)
         if other:
             # A separately installed command (e.g. Homebrew's) uses the same folder
-            entry["shared_with"] = entry.get("shared_with", []) + [other]
+            entry["shared_with"] = [*entry.get("shared_with", []), other]
         results.append(entry)
     for link in cli_links_into(app_path):
         if link not in seen_paths:
@@ -130,8 +166,13 @@ def find_associated_files(bundle_id, app_name, app_path, other_apps=()):
 
     results.sort(key=lambda r: r["category"])
     total_size = sum(r["size"] for r in results)
-    log.info("find_associated_files: found %d files (%.1f KB) for '%s' in %.2fs",
-             len(results), total_size / 1024, app_name, time.time() - t0)
+    log.info(
+        "find_associated_files: found %d files (%.1f KB) for '%s' in %.2fs",
+        len(results),
+        total_size / 1024,
+        app_name,
+        time.time() - t0,
+    )
     return results
 
 
@@ -170,8 +211,15 @@ def _mdfind_search(bundle_id, app_path_resolved):
     log.debug("_mdfind_search: searching for bundle_id=%s", bundle_id)
     try:
         result = subprocess.run(
-            ["mdfind", "kMDItemCFBundleIdentifier == '%s'" % bundle_id.replace("\\", "").replace("'", "")],
-            capture_output=True, text=True, timeout=5,
+            [
+                "mdfind",
+                "kMDItemCFBundleIdentifier == '{}'".format(
+                    bundle_id.replace("\\", "").replace("'", "")
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         paths = []
         for line in result.stdout.strip().splitlines():
@@ -181,7 +229,9 @@ def _mdfind_search(bundle_id, app_path_resolved):
             resolved = str(Path(line).resolve())
             if resolved == app_path_resolved:
                 continue
-            if resolved.startswith("/System/") or resolved.startswith("/Library/Managed Preferences/"):
+            if resolved.startswith("/System/") or resolved.startswith(
+                "/Library/Managed Preferences/"
+            ):
                 continue
             paths.append(resolved)
         log.debug("_mdfind_search: %d results for %s", len(paths), bundle_id)
