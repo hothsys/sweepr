@@ -1,3 +1,4 @@
+import contextlib
 import os
 import plistlib
 import signal
@@ -12,7 +13,8 @@ PROTECTED_CONTAINER_HELP = (
     "macOS protects this app container: other programs, Finder included, aren't allowed to "
     "remove it. It's harmless to leave. To remove it, give your terminal app (Terminal, "
     "iTerm, Hyper...) Full Disk Access in System Settings > Privacy & Security, delete the "
-    "folder from it, then turn the access off again.")
+    "folder from it, then turn the access off again."
+)
 
 PROTECTED_PREFIXES = (
     "/System/",
@@ -27,7 +29,8 @@ SELF_DIR = str(Path(__file__).parent.parent.resolve())
 
 # Folders that must never be trashed themselves, though items inside them can be.
 PROTECTED_EXACT = {
-    str(Path(p).resolve()) for p in (
+    str(Path(p).resolve())
+    for p in (
         "/",
         "/Applications",
         "/Applications/Utilities",
@@ -80,7 +83,9 @@ def running_pids(app_path):
     nor can be stopped for good; they go away once the bundle is gone."""
     prefix = str(Path(app_path).resolve()).rstrip("/") + "/"
     try:
-        result = subprocess.run(["ps", "-axo", "pid=,comm="], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            ["ps", "-axo", "pid=,comm="], capture_output=True, text=True, timeout=5
+        )
     except (OSError, subprocess.TimeoutExpired) as e:
         log.warning("running_pids: ps failed: %s", e)
         return []
@@ -88,10 +93,8 @@ def running_pids(app_path):
     for line in result.stdout.splitlines():
         parts = line.strip().split(None, 1)
         if len(parts) == 2 and parts[1].startswith(prefix) and ".appex/" not in parts[1]:
-            try:
+            with contextlib.suppress(ValueError):
                 pids.append(int(parts[0]))
-            except ValueError:
-                pass
     return [pid for pid in pids if pid != os.getpid()]
 
 
@@ -153,9 +156,11 @@ def quit_app(app_path):
     escaped = str(app_path).replace("\\", "\\\\").replace('"', '\\"')
     # "is running" checks without launching; a plain tell would start the app if
     # Launch Services doesn't know it's running (e.g. a helper started directly)
-    script = (f'if application "{escaped}" is running then\n'
-              f'ignoring application responses\ntell application "{escaped}" to quit\nend ignoring\n'
-              f'end if')
+    script = (
+        f'if application "{escaped}" is running then\n'
+        f'ignoring application responses\ntell application "{escaped}" to quit\nend ignoring\n'
+        f"end if"
+    )
     try:
         subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -183,9 +188,13 @@ def quit_app(app_path):
 
     remaining = running_pids(app_path)
     log.error("quit_app: could not stop %s (pids %s still running)", name, remaining)
-    return {"was_running": True, "forced": True, "ok": False,
-            "error": f"{name} is still running and could not be quit "
-                     f"(some of its processes need administrator rights to stop)"}
+    return {
+        "was_running": True,
+        "forced": True,
+        "ok": False,
+        "error": f"{name} is still running and could not be quit "
+        f"(some of its processes need administrator rights to stop)",
+    }
 
 
 def find_login_items(app_path):
@@ -195,15 +204,19 @@ def find_login_items(app_path):
     app registered itself through SMAppService aren't listed here; they stop
     working once the bundle is gone."""
     target = str(Path(app_path)).rstrip("/")
-    script = ('tell application "System Events"\n'
-              'set out to ""\n'
-              'repeat with li in every login item\n'
-              'set out to out & (name of li) & tab & (path of li) & linefeed\n'
-              'end repeat\n'
-              'return out\n'
-              'end tell')
+    script = (
+        'tell application "System Events"\n'
+        'set out to ""\n'
+        "repeat with li in every login item\n"
+        "set out to out & (name of li) & tab & (path of li) & linefeed\n"
+        "end repeat\n"
+        "return out\n"
+        "end tell"
+    )
     try:
-        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            ["osascript", "-e", script], capture_output=True, text=True, timeout=15
+        )
     except (OSError, subprocess.TimeoutExpired) as e:
         log.warning("find_login_items: could not list login items: %s", e)
         return []
@@ -226,8 +239,16 @@ def delete_login_items(names):
     for item_name in names:
         esc = item_name.replace("\\", "\\\\").replace('"', '\\"')
         try:
-            r = subprocess.run(["osascript", "-e", f'tell application "System Events" to delete login item "{esc}"'],
-                               capture_output=True, text=True, timeout=15)
+            r = subprocess.run(
+                [
+                    "osascript",
+                    "-e",
+                    f'tell application "System Events" to delete login item "{esc}"',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
         except (OSError, subprocess.TimeoutExpired) as e:
             log.warning("delete_login_items: could not remove %r: %s", item_name, e)
             continue
@@ -254,7 +275,9 @@ def _trash_single(path):
     # Finder hides dot-named items, inside the Trash too, so ~/.ollama would sit
     # there invisibly: impossible to see or restore. Give it a visible name that
     # records the original.
-    trash_name = f"{p.name[1:]} (was {p.name})" if p.name.startswith(".") and len(p.name) > 1 else p.name
+    trash_name = (
+        f"{p.name[1:]} (was {p.name})" if p.name.startswith(".") and len(p.name) > 1 else p.name
+    )
     dest = trash_dir / trash_name
     if os.path.lexists(dest):
         # Keep a real extension (Foo 1.app, notes 1.txt), but don't split
@@ -288,7 +311,11 @@ def _trash_single(path):
             # failing (-1700) when the target is gone and acting on the target
             # instead of the link when it isn't. Move the link itself, with admin
             # rights, which is what root-owned folders like /usr/local/bin need.
-            log.warning("_trash_single: rename refused for symlink %s (%s), moving it with admin rights", path, e)
+            log.warning(
+                "_trash_single: rename refused for symlink %s (%s), moving it with admin rights",
+                path,
+                e,
+            )
             return _trash_link_with_admin(path, str(dest))
         # EPERM/EACCES: protected or root-owned. EXDEV: on another volume, whose
         # Trash is elsewhere. Finder handles these, asking for permission as needed.
@@ -305,11 +332,14 @@ def _trash_link_with_admin(path, dest):
     rights, then give it back to the user so emptying the Trash needs no password.
     macOS shows its own password prompt; cancelling it fails cleanly."""
     user = str(os.getuid())
-    script = ('do shell script "/bin/mv -n -- " & quoted form of {src} & " " & quoted form of {dst} '
-              '& " && /usr/sbin/chown -h {uid} " & quoted form of {dst} with administrator privileges'
-              ).format(src=_applescript_str(path), dst=_applescript_str(dest), uid=user)
+    script = (
+        f'do shell script "/bin/mv -n -- " & quoted form of {_applescript_str(path)} & " " & quoted form of {_applescript_str(dest)} '
+        f'& " && /usr/sbin/chown -h {user} " & quoted form of {_applescript_str(dest)} with administrator privileges'
+    )
     try:
-        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            ["osascript", "-e", script], capture_output=True, text=True, timeout=120
+        )
     except subprocess.TimeoutExpired:
         log.error("_trash_link_with_admin: timed out waiting for the password prompt for %s", path)
         return False, "Timed out waiting for the administrator password"
@@ -334,7 +364,9 @@ def _trash_via_osascript(path):
     try:
         result = subprocess.run(
             ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0:
             # A zero exit code is not proof of removal. When the privileged delete
@@ -378,7 +410,8 @@ def _verify_safe(path):
     # A folder in /Applications that mirrors one in /System/Applications
     # (Utilities, and any similar folder a future macOS adds)
     rp = Path(resolved)
-    if (str(rp.parent) == "/Applications" and not rp.name.endswith(".app")
-            and (SYSTEM_APPS_DIR / rp.name).is_dir()):
-        return False
-    return True
+    return not (
+        str(rp.parent) == "/Applications"
+        and not rp.name.endswith(".app")
+        and (SYSTEM_APPS_DIR / rp.name).is_dir()
+    )
