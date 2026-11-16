@@ -3,7 +3,7 @@ import os
 import re as _re
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from lib.log import log
 
@@ -42,8 +42,12 @@ def scan_homebrew_quick():
 
     _annotate_from_receipts(packages, info, fill_basics=True)
     packages.sort(key=lambda p: p["name"].lower())
-    log.info("scan_homebrew_quick: complete — %d formulae, %d casks in %.2fs",
-             len(packages) - cask_count, cask_count, time.time() - t0)
+    log.info(
+        "scan_homebrew_quick: complete — %d formulae, %d casks in %.2fs",
+        len(packages) - cask_count,
+        cask_count,
+        time.time() - t0,
+    )
     return packages
 
 
@@ -99,15 +103,28 @@ def cask_app_index():
 
 
 def _blank_package(name, pkg_type):
-    return {"name": name, "version": "", "description": "", "type": pkg_type,
-            # Casks are always installed on request; formulae get this from the receipt
-            "installed_on_request": True if pkg_type == "cask" else None,
-            "installed_at": None, "size": 0, "outdated": False, "pinned": False, "dependencies": 0}
+    return {
+        "name": name,
+        "version": "",
+        "description": "",
+        "type": pkg_type,
+        # Casks are always installed on request; formulae get this from the receipt
+        "installed_on_request": True if pkg_type == "cask" else None,
+        "installed_at": None,
+        "size": 0,
+        "outdated": False,
+        "pinned": False,
+        "dependencies": 0,
+    }
 
 
 def _version_key(version):
     """Natural sort key, so 10.0 sorts after 9.0 and 1.10 after 1.9_1."""
-    return [(0, int(part)) if part.isdigit() else (1, part) for part in _re.split(r"(\d+)", version) if part]
+    return [
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in _re.split(r"(\d+)", version)
+        if part
+    ]
 
 
 def _active_keg_version(cellar, name, versions):
@@ -148,16 +165,24 @@ def _local_formula_info(cellar):
         if not versions:
             continue
         version = _active_keg_version(cellar, name, versions)
-        entry = {"version": version, "installed_on_request": None, "installed_at": None,
-                 "runtime_deps": [], "used_by": [], "tap": None}
+        entry = {
+            "version": version,
+            "installed_on_request": None,
+            "installed_at": None,
+            "runtime_deps": [],
+            "used_by": [],
+            "tap": None,
+        }
         try:
             with open(os.path.join(keg_root, version, "INSTALL_RECEIPT.json")) as f:
                 receipt = json.load(f)
             entry["installed_on_request"] = bool(receipt.get("installed_on_request"))
             entry["tap"] = (receipt.get("source") or {}).get("tap")
             entry["installed_at"] = _format_timestamp(receipt.get("time"))
-            entry["runtime_deps"] = [d.get("full_name", "").split("/")[-1]
-                                     for d in receipt.get("runtime_dependencies") or []]
+            entry["runtime_deps"] = [
+                d.get("full_name", "").split("/")[-1]
+                for d in receipt.get("runtime_dependencies") or []
+            ]
         except (OSError, ValueError) as e:
             log.debug("_local_formula_info: no usable receipt for %s: %s", name, e)
         info[name] = entry
@@ -175,7 +200,7 @@ def _registered_services():
         try:
             for f in os.listdir(d):
                 if f.startswith("homebrew.mxcl.") and f.endswith(".plist"):
-                    names.add(f[len("homebrew.mxcl."):-len(".plist")])
+                    names.add(f[len("homebrew.mxcl.") : -len(".plist")])
         except OSError:
             continue
     return names
@@ -192,7 +217,9 @@ def _annotate_from_receipts(packages, info, fill_basics=False):
         if pkg["type"] == "cask" and pkg.get("apps"):
             # Removed by dragging to the Trash: Homebrew still lists the cask, and
             # `brew upgrade` reinstalls the app when a new version comes out
-            pkg["app_missing"] = not any(os.path.exists(os.path.join(d, a)) for d in app_dirs for a in pkg["apps"])
+            pkg["app_missing"] = not any(
+                os.path.exists(os.path.join(d, a)) for d in app_dirs for a in pkg["apps"]
+            )
         # brew services only manages formulae
         pkg["service"] = pkg["type"] == "formula" and pkg["name"] in services
         if pkg["type"] != "formula":
@@ -233,7 +260,9 @@ def scan_homebrew():
     try:
         result = subprocess.run(
             ["brew", "info", "--json=v2", "--installed"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode != 0:
             err = result.stderr.strip()
@@ -279,8 +308,12 @@ def scan_homebrew():
     # After the casks are added, so they get service/used_by/app_missing too
     _annotate_from_receipts(packages, _local_formula_info(cellar))
     packages.sort(key=lambda p: p["name"].lower())
-    log.info("scan_homebrew: complete — %d formulae, %d casks in %.2fs",
-             len(packages) - cask_count, cask_count, time.time() - t0)
+    log.info(
+        "scan_homebrew: complete — %d formulae, %d casks in %.2fs",
+        len(packages) - cask_count,
+        cask_count,
+        time.time() - t0,
+    )
     return packages, None
 
 
@@ -300,14 +333,19 @@ def _find_cellar_path():
     try:
         result = subprocess.run(
             ["brew", "--cellar"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         path = result.stdout.strip()
         if result.returncode == 0 and os.path.isdir(path):
             log.debug("_get_cellar_path: %s", path)
             return path
-        log.warning("_get_cellar_path: brew --cellar gave %r (exit %d), using default",
-                    path, result.returncode)
+        log.warning(
+            "_get_cellar_path: brew --cellar gave %r (exit %d), using default",
+            path,
+            result.returncode,
+        )
     except Exception as e:
         log.warning("_get_cellar_path: failed, using default: %s", e)
     for default in ("/opt/homebrew/Cellar", "/usr/local/Cellar"):
@@ -329,7 +367,7 @@ def _parse_formula(f, cellar):
     # installed as Cellar/sdl2), listed under oldnames or aliases
     keg_name = f["name"]
     if cellar:
-        for candidate in [f["name"]] + list(f.get("oldnames") or []) + list(f.get("aliases") or []):
+        for candidate in [f["name"], *list(f.get("oldnames") or []), *list(f.get("aliases") or [])]:
             if os.path.isdir(os.path.join(cellar, candidate)):
                 keg_name = candidate
                 break
@@ -341,7 +379,9 @@ def _parse_formula(f, cellar):
         "version": version,
         "description": f.get("desc", ""),
         "type": "formula",
-        "installed_on_request": inst.get("installed_on_request"),  # None if brew omits it: unknown, not "dependency"
+        "installed_on_request": inst.get(
+            "installed_on_request"
+        ),  # None if brew omits it: unknown, not "dependency"
         "installed_at": _format_timestamp(timestamp),
         "size": 0,
         "_cellar_path": cellar_path if cellar_path and os.path.isdir(cellar_path) else None,
@@ -357,8 +397,13 @@ def _parse_cask(c):
         "name": c.get("token", ""),
         "tap": c.get("tap"),
         "has_zap": any(isinstance(a, dict) and a.get("zap") for a in c.get("artifacts") or []),
-        "apps": [os.path.basename(x) for a in c.get("artifacts") or [] if isinstance(a, dict)
-                 for x in (a.get("app") or []) if isinstance(x, str) and x.endswith(".app")],
+        "apps": [
+            os.path.basename(x)
+            for a in c.get("artifacts") or []
+            if isinstance(a, dict)
+            for x in (a.get("app") or [])
+            if isinstance(x, str) and x.endswith(".app")
+        ],
         "version": c.get("installed", ""),
         "description": c.get("desc", ""),
         "type": "cask",
@@ -367,7 +412,11 @@ def _parse_cask(c):
         "size": 0,
         "outdated": c.get("outdated", False),
         "pinned": False,
-        "dependencies": len(c.get("depends_on", {}).get("formula", []) if isinstance(c.get("depends_on"), dict) else []),
+        "dependencies": len(
+            c.get("depends_on", {}).get("formula", [])
+            if isinstance(c.get("depends_on"), dict)
+            else []
+        ),
     }
 
 
@@ -375,14 +424,20 @@ def _format_timestamp(ts):
     if not ts:
         return None
     try:
-        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     except (OSError, ValueError):
         return None
 
 
 # Taps that ship with Homebrew; never removed
-CORE_TAPS = {"homebrew/core", "homebrew/cask", "homebrew/services", "homebrew/bundle",
-             "homebrew/cask-fonts", "homebrew/cask-versions"}
+CORE_TAPS = {
+    "homebrew/core",
+    "homebrew/cask",
+    "homebrew/services",
+    "homebrew/bundle",
+    "homebrew/cask-fonts",
+    "homebrew/cask-versions",
+}
 
 
 def is_third_party_tap(tap):
@@ -396,8 +451,14 @@ def untap_if_unused(tap):
     if not is_third_party_tap(tap):
         return False, f"{tap} ships with Homebrew"
     try:
-        listed = subprocess.run(["brew", "list", "--full-name"], capture_output=True, text=True,
-                                timeout=60, stdin=subprocess.DEVNULL, env=_BREW_ENV)
+        listed = subprocess.run(
+            ["brew", "list", "--full-name"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            stdin=subprocess.DEVNULL,
+            env=_BREW_ENV,
+        )
     except (OSError, subprocess.TimeoutExpired) as e:
         log.warning("untap_if_unused: brew list failed: %s", e)
         return False, "couldn't check what else uses the tap"
@@ -406,13 +467,21 @@ def untap_if_unused(tap):
         log.info("untap_if_unused: keeping %s, still used by %s", tap, still)
         return False, f"{tap} is still used by {', '.join(s.split('/')[-1] for s in still)}"
     try:
-        r = subprocess.run(["brew", "untap", tap], capture_output=True, text=True,
-                           timeout=120, stdin=subprocess.DEVNULL, env=_BREW_ENV)
+        r = subprocess.run(
+            ["brew", "untap", tap],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            stdin=subprocess.DEVNULL,
+            env=_BREW_ENV,
+        )
     except (OSError, subprocess.TimeoutExpired) as e:
         log.warning("untap_if_unused: brew untap %s failed: %s", tap, e)
         return False, f"brew untap {tap} failed"
     if r.returncode != 0:
-        log.warning("untap_if_unused: brew untap %s exited %d: %s", tap, r.returncode, r.stderr.strip())
+        log.warning(
+            "untap_if_unused: brew untap %s exited %d: %s", tap, r.returncode, r.stderr.strip()
+        )
         return False, r.stderr.strip() or f"brew untap {tap} failed"
     log.info("untap_if_unused: untapped %s", tap)
     return True, ""
@@ -436,10 +505,18 @@ def uninstall_package(name, pkg_type, zap=False):
         # leaves a half-removed package. stdin is closed so a sudo prompt fails
         # fast instead of hanging on the terminal that started the server.
         t0 = time.time()
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=UNINSTALL_TIMEOUT,
-                                stdin=subprocess.DEVNULL, env=_BREW_ENV)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=UNINSTALL_TIMEOUT,
+            stdin=subprocess.DEVNULL,
+            env=_BREW_ENV,
+        )
         if result.returncode == 0:
-            log.info("uninstall_package: successfully uninstalled %s in %.1fs", name, time.time() - t0)
+            log.info(
+                "uninstall_package: successfully uninstalled %s in %.1fs", name, time.time() - t0
+            )
             removed = _autoremove()
             return {"success": True, "output": result.stdout.strip(), "autoremoved": removed}
         err = result.stderr.strip() or "Unknown error"
@@ -457,8 +534,14 @@ def _autoremove():
     """Run brew autoremove and return the names it removed, so the UI can say so."""
     try:
         log.info("_autoremove: running brew autoremove")
-        result = subprocess.run(["brew", "autoremove"], capture_output=True, text=True,
-                                timeout=AUTOREMOVE_TIMEOUT, stdin=subprocess.DEVNULL, env=_BREW_ENV)
+        result = subprocess.run(
+            ["brew", "autoremove"],
+            capture_output=True,
+            text=True,
+            timeout=AUTOREMOVE_TIMEOUT,
+            stdin=subprocess.DEVNULL,
+            env=_BREW_ENV,
+        )
     except Exception as e:
         log.warning("_autoremove: failed: %s", e)
         return []
@@ -466,8 +549,11 @@ def _autoremove():
         log.warning("_autoremove: exited %d: %s", result.returncode, result.stderr.strip())
         return []
     # Output looks like "==> Autoremoving 2 unneeded formulae:" then one name per line
-    removed = [line.strip() for line in result.stdout.splitlines()
-               if line.strip() and not line.startswith("==>")]
+    removed = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip() and not line.startswith("==>")
+    ]
     log.info("_autoremove: removed %d package(s): %s", len(removed), removed)
     return removed
 
@@ -483,15 +569,21 @@ def _batch_dir_sizes(paths):
     t0 = time.time()
     try:
         result = subprocess.run(
-            ["du", "-sk"] + valid,
-            capture_output=True, text=True, timeout=30,
+            ["du", "-sk", *valid],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         sizes = {}
         for line in result.stdout.strip().splitlines():
             parts = line.split("\t", 1)
             if len(parts) == 2:
                 sizes[parts[1]] = int(parts[0]) * 1024
-        log.debug("_batch_dir_sizes (brew): computed sizes for %d paths in %.2fs", len(sizes), time.time() - t0)
+        log.debug(
+            "_batch_dir_sizes (brew): computed sizes for %d paths in %.2fs",
+            len(sizes),
+            time.time() - t0,
+        )
         return sizes
     except Exception as e:
         log.error("_batch_dir_sizes (brew): failed: %s", e)
