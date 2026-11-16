@@ -6,6 +6,7 @@ its downloaded models in ~/.ollama, often many GB) and link a command into
 /usr/local/bin. Neither is under ~/Library, so the associated-file and orphan
 scans used to miss both.
 """
+
 import os
 import shutil
 import subprocess
@@ -19,19 +20,54 @@ HOME = Path.home()
 KNOWN_TOOLS = [
     {"name": "Ollama", "folders": [".ollama"], "apps": ["Ollama"], "commands": ["ollama"]},
     {"name": "Docker", "folders": [".docker"], "apps": ["Docker"], "commands": ["docker"]},
-    {"name": "Visual Studio Code", "folders": [".vscode", ".vscode-shared"],
-     "apps": ["Visual Studio Code", "Code"], "commands": ["code"]},
+    {
+        "name": "Visual Studio Code",
+        "folders": [".vscode", ".vscode-shared"],
+        "apps": ["Visual Studio Code", "Code"],
+        "commands": ["code"],
+    },
     {"name": "Cursor", "folders": [".cursor"], "apps": ["Cursor"], "commands": ["cursor"]},
-    {"name": "LM Studio", "folders": [".lmstudio", ".cache/lm-studio"], "apps": ["LM Studio"],
-     "commands": ["lms"]},
+    {
+        "name": "LM Studio",
+        "folders": [".lmstudio", ".cache/lm-studio"],
+        "apps": ["LM Studio"],
+        "commands": ["lms"],
+    },
 ]
 
 # Never offered, whatever an app is called: credentials, shell and toolchain state
 NEVER = {
-    ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker-credentials", ".netrc", ".git",
-    ".config", ".local", ".cache", ".Trash", ".npm", ".nvm", ".pyenv", ".rbenv", ".rvm",
-    ".sdkman", ".cargo", ".rustup", ".m2", ".gradle", ".zsh_sessions", ".bash_sessions",
-    ".claude", ".codex", ".copilot", ".github", ".vim", ".tsh", ".pip",
+    ".ssh",
+    ".gnupg",
+    ".aws",
+    ".azure",
+    ".kube",
+    ".docker-credentials",
+    ".netrc",
+    ".git",
+    ".config",
+    ".local",
+    ".cache",
+    ".Trash",
+    ".npm",
+    ".nvm",
+    ".pyenv",
+    ".rbenv",
+    ".rvm",
+    ".sdkman",
+    ".cargo",
+    ".rustup",
+    ".m2",
+    ".gradle",
+    ".zsh_sessions",
+    ".bash_sessions",
+    ".claude",
+    ".codex",
+    ".copilot",
+    ".github",
+    ".vim",
+    ".tsh",
+    ".pip",
 }
 
 # Apps' "install command line tool" links land here; only links pointing into an
@@ -124,7 +160,7 @@ def dangling_app_links():
             i = target.find(".app/")
             if i == -1:
                 continue
-            app_path = target[:i + 4]
+            app_path = target[: i + 4]
             if not os.path.exists(app_path):
                 result.append((p, app_path))
     return result
@@ -134,9 +170,11 @@ def app_bundle_exists_anywhere(app_names):
     """True if Spotlight knows an app bundle with one of these names outside the
     Trash (an install the app scan doesn't cover)."""
     for name in app_names:
-        query = "kMDItemFSName == '%s.app'c" % name.replace("'", "")
+        query = "kMDItemFSName == '{}.app'c".format(name.replace("'", ""))
         try:
-            out = subprocess.run(["mdfind", query], capture_output=True, text=True, timeout=5).stdout
+            out = subprocess.run(
+                ["mdfind", query], capture_output=True, text=True, timeout=5
+            ).stdout
         except (OSError, subprocess.TimeoutExpired) as e:
             log.warning("app_bundle_exists_anywhere: mdfind failed for %s: %s", name, e)
             return True  # can't confirm it's gone
