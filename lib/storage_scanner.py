@@ -1,3 +1,4 @@
+import contextlib
 import os
 import subprocess
 import threading
@@ -15,17 +16,17 @@ HOME = Path.home()
 # "Home" is the whole user directory; the entries below it are quick shortcuts
 # into its most common space consumers. "Libraries" is split into user/system.
 _ROOT_DEFS = [
-    ("Home", str(HOME), "\U0001F3E0"),
-    ("Applications", "/Applications", "\U0001F4E6"),
-    ("Documents", str(HOME / "Documents"), "\U0001F4C4"),
+    ("Home", str(HOME), "\U0001f3e0"),
+    ("Applications", "/Applications", "\U0001f4e6"),
+    ("Documents", str(HOME / "Documents"), "\U0001f4c4"),
     ("Downloads", str(HOME / "Downloads"), "⬇️"),
-    ("Desktop", str(HOME / "Desktop"), "\U0001F5A5️"),
-    ("Pictures", str(HOME / "Pictures"), "\U0001F5BC️"),
-    ("Movies", str(HOME / "Movies"), "\U0001F3AC"),
-    ("Music", str(HOME / "Music"), "\U0001F3B5"),
-    ("Developer", str(HOME / "Developer"), "\U0001F6E0️"),
-    ("Library (User)", str(HOME / "Library"), "\U0001F5C4️"),
-    ("Library (System)", "/Library", "\U0001F5C4️"),
+    ("Desktop", str(HOME / "Desktop"), "\U0001f5a5️"),
+    ("Pictures", str(HOME / "Pictures"), "\U0001f5bc️"),
+    ("Movies", str(HOME / "Movies"), "\U0001f3ac"),
+    ("Music", str(HOME / "Music"), "\U0001f3b5"),
+    ("Developer", str(HOME / "Developer"), "\U0001f6e0️"),
+    ("Library (User)", str(HOME / "Library"), "\U0001f5c4️"),
+    ("Library (System)", "/Library", "\U0001f5c4️"),
 ]
 
 
@@ -45,10 +46,8 @@ def _root_paths():
     for _, path, _emoji in _ROOT_DEFS:
         p = Path(path)
         if p.is_dir():
-            try:
+            with contextlib.suppress(OSError):
                 paths.append(str(p.resolve()))
-            except OSError:
-                pass
     return paths
 
 
@@ -61,10 +60,7 @@ def is_in_scope(path):
         resolved = str(Path(path).resolve())
     except OSError:
         return False
-    for root in _root_paths():
-        if resolved == root or resolved.startswith(root + os.sep):
-            return True
-    return False
+    return any(resolved == root or resolved.startswith(root + os.sep) for root in _root_paths())
 
 
 def list_children(path):
@@ -85,25 +81,29 @@ def list_children(path):
                 except OSError:
                     is_dir = False
                 if is_dir:
-                    dirs.append({
-                        "name": entry.name,
-                        "path": entry.path,
-                        "is_dir": True,
-                        "size": 0,
-                        "accessible": True,
-                    })
+                    dirs.append(
+                        {
+                            "name": entry.name,
+                            "path": entry.path,
+                            "is_dir": True,
+                            "size": 0,
+                            "accessible": True,
+                        }
+                    )
                 else:
                     try:
                         size = entry.stat(follow_symlinks=False).st_size
                     except OSError:
                         size = 0
-                    files.append({
-                        "name": entry.name,
-                        "path": entry.path,
-                        "is_dir": False,
-                        "size": size,
-                        "accessible": True,
-                    })
+                    files.append(
+                        {
+                            "name": entry.name,
+                            "path": entry.path,
+                            "is_dir": False,
+                            "size": size,
+                            "accessible": True,
+                        }
+                    )
     except PermissionError:
         log.warning("list_children: permission denied for %s (requires Full Disk Access)", path)
         return None
@@ -116,10 +116,8 @@ def list_children(path):
 def _kill_stuck(proc, target):
     if proc.poll() is None:
         log.warning("stream_dir_sizes: du for %s exceeded %ds, killing it", target, DU_TIMEOUT)
-        try:
+        with contextlib.suppress(OSError):
             proc.kill()
-        except OSError:
-            pass
 
 
 def stream_dir_sizes(path, on_child):
@@ -169,15 +167,16 @@ def stream_dir_sizes(path, on_child):
     finally:
         watchdog.cancel()
         if proc.poll() is None:
-            try:
+            with contextlib.suppress(OSError):
                 proc.kill()
-            except OSError:
-                pass
-        try:
-            proc.wait(timeout=5)  # reap it so no zombie is left behind
-        except subprocess.TimeoutExpired:
-            pass
+        # reap it so no zombie is left behind
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=5)
 
-    log.info("stream_dir_sizes: %s -> %s bytes in %.2fs",
-             target, total if total is not None else "?", time.time() - t0)
+    log.info(
+        "stream_dir_sizes: %s -> %s bytes in %.2fs",
+        target,
+        total if total is not None else "?",
+        time.time() - t0,
+    )
     return total

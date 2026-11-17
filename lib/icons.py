@@ -1,3 +1,4 @@
+import contextlib
 import os
 import struct
 import subprocess
@@ -139,8 +140,6 @@ def _convert_with_sips(icns_path):
     finally:
         # Removed on every path, including timeouts (it used to leak then)
         if tmp_path:
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
     return None

@@ -1,3 +1,4 @@
+import contextlib
 import os
 import plistlib
 import subprocess
@@ -7,16 +8,13 @@ from pathlib import Path
 from lib.log import log
 from lib.sizes import disk_usage
 
-
 SCAN_DIRS = [
     Path("/Applications"),
     Path("/System/Applications"),
     Path.home() / "Applications",
 ]
 
-SYSTEM_BUNDLE_PREFIXES = (
-    "com.apple.",
-)
+SYSTEM_BUNDLE_PREFIXES = ("com.apple.",)
 
 SYSTEM_PATHS = (
     "/System/",
@@ -63,18 +61,27 @@ def scan_applications(include_size=False):
                         resolved = sub
                         if sub.is_symlink():
                             resolved = Path(os.path.realpath(sub))
-                        if resolved.name.endswith(".app") and resolved.is_dir():
-                            _collect_app(resolved, app_entries, seen_paths, parent_name, entry if sub.is_symlink() else None)
-                            found_app = True
-                        elif sub.name.endswith(".app") or (resolved.is_dir() and resolved.name.endswith(".app")):
-                            _collect_app(resolved, app_entries, seen_paths, parent_name, entry if sub.is_symlink() else None)
+                        if (
+                            (resolved.name.endswith(".app") and resolved.is_dir())
+                            or sub.name.endswith(".app")
+                            or (resolved.is_dir() and resolved.name.endswith(".app"))
+                        ):
+                            _collect_app(
+                                resolved,
+                                app_entries,
+                                seen_paths,
+                                parent_name,
+                                entry if sub.is_symlink() else None,
+                            )
                             found_app = True
                 except PermissionError:
                     log.warning("scan_applications: permission denied reading %s", entry)
                     continue
                 if not found_app:
                     if _is_system_folder(entry):
-                        log.info("scan_applications: %s mirrors a system folder, not a leftover", entry)
+                        log.info(
+                            "scan_applications: %s mirrors a system folder, not a leftover", entry
+                        )
                         continue
                     if _contains_app(entry):
                         log.info("scan_applications: %s holds a nested .app, not a leftover", entry)
@@ -89,8 +96,9 @@ def scan_applications(include_size=False):
     metadata_map = batch_spotlight_metadata(all_paths)
 
     for app_path, parent_name, discovered_in in app_entries:
-        info = _build_app_info(app_path, parent_name, discovered_in,
-                               metadata_map.get(str(app_path), {}), include_size)
+        info = _build_app_info(
+            app_path, parent_name, discovered_in, metadata_map.get(str(app_path), {}), include_size
+        )
         if info:
             apps.append(info)
 
@@ -134,13 +142,15 @@ def _build_leftover_info(path):
         for entry in path.iterdir():
             if entry.is_file() and not entry.suffix and _is_uninstaller_name(entry.name):
                 uninstaller = {"type": "alias", "path": str(entry), "name": entry.name}
-                log.debug("_build_leftover_info: found uninstaller %s in leftover %s", entry.name, path.name)
+                log.debug(
+                    "_build_leftover_info: found uninstaller %s in leftover %s",
+                    entry.name,
+                    path.name,
+                )
         for dirpath, _, filenames in os.walk(path):
             for f in filenames:
-                try:
+                with contextlib.suppress(OSError):
                     size += os.path.getsize(os.path.join(dirpath, f))
-                except OSError:
-                    pass
     except PermissionError:
         pass
     if size == 0:
@@ -183,8 +193,11 @@ def _contains_app(path, max_depth=LEFTOVER_APP_SEARCH_DEPTH):
         if dirpath.count(os.sep) - base_depth >= max_depth:
             dirnames[:] = []
     if unreadable:
-        log.info("_contains_app: %s is partly unreadable (%s), assuming it may hold an app",
-                 path, unreadable[0])
+        log.info(
+            "_contains_app: %s is partly unreadable (%s), assuming it may hold an app",
+            path,
+            unreadable[0],
+        )
         return True  # can't see everything, so don't call it a safe leftover
     return False
 
@@ -210,11 +223,7 @@ def _build_app_info(app_path, parent_name, discovered_in, metadata, include_size
         log.warning("_build_app_info: failed to read plist for %s: %s", app_path, e)
         return None
 
-    name = (
-        plist.get("CFBundleDisplayName")
-        or plist.get("CFBundleName")
-        or app_path.stem
-    )
+    name = plist.get("CFBundleDisplayName") or plist.get("CFBundleName") or app_path.stem
     if parent_name and parent_name.lower() != name.lower():
         name = f"{name} ({parent_name})"
     bundle_id = plist.get("CFBundleIdentifier", "")
@@ -265,7 +274,11 @@ def find_uninstaller(app_path, parent_name=None, discovered_in=None):
         if search_dir.is_dir():
             for entry in _list_dir(search_dir):
                 if entry.name.endswith(".app") and _is_uninstaller_name(entry.name):
-                    log.debug("find_uninstaller: found nested app uninstaller %s for %s", entry.name, app_path.name)
+                    log.debug(
+                        "find_uninstaller: found nested app uninstaller %s for %s",
+                        entry.name,
+                        app_path.name,
+                    )
                     return {"type": "app", "path": str(entry), "name": entry.stem}
 
     # 2. Executables in Contents/MacOS/ with uninstall-related names
@@ -273,17 +286,28 @@ def find_uninstaller(app_path, parent_name=None, discovered_in=None):
     if macos_dir.is_dir():
         for entry in _list_dir(macos_dir):
             if entry.is_file() and os.access(entry, os.X_OK) and _is_uninstaller_name(entry.name):
-                log.debug("find_uninstaller: found executable uninstaller %s for %s", entry.name, app_path.name)
+                log.debug(
+                    "find_uninstaller: found executable uninstaller %s for %s",
+                    entry.name,
+                    app_path.name,
+                )
                 return {"type": "executable", "path": str(entry), "name": entry.name}
 
     # 3. Shell scripts in Contents/Resources/
     resources_dir = app_path / "Contents" / "Resources"
     if resources_dir.is_dir():
         for entry in _list_dir(resources_dir):
-            if entry.is_file() and entry.suffix in (".sh", ".bash", ".zsh", "") and _is_uninstaller_name(entry.name):
-                if entry.suffix in (".sh", ".bash", ".zsh") or os.access(entry, os.X_OK):
-                    log.debug("find_uninstaller: found script uninstaller %s for %s", entry.name, app_path.name)
-                    return {"type": "script", "path": str(entry), "name": entry.name}
+            if (
+                entry.is_file()
+                and entry.suffix in (".sh", ".bash", ".zsh", "")
+                and _is_uninstaller_name(entry.name)
+            ) and (entry.suffix in (".sh", ".bash", ".zsh") or os.access(entry, os.X_OK)):
+                log.debug(
+                    "find_uninstaller: found script uninstaller %s for %s",
+                    entry.name,
+                    app_path.name,
+                )
+                return {"type": "script", "path": str(entry), "name": entry.name}
 
     # 4. Sibling entries in the parent directory
     search_dirs = set()
@@ -303,15 +327,27 @@ def find_uninstaller(app_path, parent_name=None, discovered_in=None):
                 resolved = Path(os.path.realpath(entry)) if entry.is_symlink() else entry
                 if _is_uninstaller_name(entry.name):
                     if resolved.is_dir() and resolved.name.endswith(".app"):
-                        log.debug("find_uninstaller: found sibling app uninstaller %s for %s", entry.name, app_path.name)
+                        log.debug(
+                            "find_uninstaller: found sibling app uninstaller %s for %s",
+                            entry.name,
+                            app_path.name,
+                        )
                         return {"type": "app", "path": str(resolved), "name": entry.stem}
                     if resolved.is_dir() and resolved.name.endswith(".bundle"):
                         exec_path = _bundle_executable(resolved)
                         if exec_path:
-                            log.debug("find_uninstaller: found bundle uninstaller %s for %s", entry.name, app_path.name)
+                            log.debug(
+                                "find_uninstaller: found bundle uninstaller %s for %s",
+                                entry.name,
+                                app_path.name,
+                            )
                             return {"type": "executable", "path": exec_path, "name": entry.name}
                     if entry.is_file() and not entry.suffix:
-                        log.debug("find_uninstaller: found alias/file uninstaller %s for %s", entry.name, app_path.name)
+                        log.debug(
+                            "find_uninstaller: found alias/file uninstaller %s for %s",
+                            entry.name,
+                            app_path.name,
+                        )
                         return {"type": "alias", "path": str(entry), "name": entry.name}
         except PermissionError:
             log.warning("find_uninstaller: permission denied reading %s", search_parent)
@@ -324,7 +360,11 @@ def find_uninstaller(app_path, parent_name=None, discovered_in=None):
                 if sibling == app_path or not sibling.name.endswith(".app"):
                     continue
                 if _is_uninstaller_name(sibling.name) and _names_overlap(sibling.stem, app_stem):
-                    log.debug("find_uninstaller: found sibling uninstaller app %s for %s", sibling.name, app_path.name)
+                    log.debug(
+                        "find_uninstaller: found sibling uninstaller app %s for %s",
+                        sibling.name,
+                        app_path.name,
+                    )
                     return {"type": "app", "path": str(sibling), "name": sibling.stem}
         except PermissionError:
             log.warning("find_uninstaller: permission denied reading parent of %s", app_path)
@@ -339,8 +379,16 @@ def _is_uninstaller_name(name):
 
 def _names_overlap(a, b):
     skip = {"the", "app", "and", "for", "remove", "uninstall", "client", "desktop"}
-    words_a = {w.lower() for w in a.replace("-", " ").replace("_", " ").split() if len(w) > 2 and w.lower() not in skip}
-    words_b = {w.lower() for w in b.replace("-", " ").replace("_", " ").split() if len(w) > 2 and w.lower() not in skip}
+    words_a = {
+        w.lower()
+        for w in a.replace("-", " ").replace("_", " ").split()
+        if len(w) > 2 and w.lower() not in skip
+    }
+    words_b = {
+        w.lower()
+        for w in b.replace("-", " ").replace("_", " ").split()
+        if len(w) > 2 and w.lower() not in skip
+    }
     return bool(words_a & words_b)
 
 
@@ -380,8 +428,11 @@ def batch_spotlight_metadata(app_paths):
     # with exit code 0, shifting every later value, so only pass real paths
     existing = [p for p in app_paths if os.path.exists(p)]
     metadata_map = _mdls_batch(existing)
-    log.info("batch_spotlight_metadata: fetched metadata for %d apps in %.2fs",
-             len(metadata_map), time.time() - t0)
+    log.info(
+        "batch_spotlight_metadata: fetched metadata for %d apps in %.2fs",
+        len(metadata_map),
+        time.time() - t0,
+    )
     return metadata_map
 
 
@@ -404,10 +455,13 @@ def _mdls_batch(paths):
     values = result.stdout.split("\0")
     if len(values) != len(paths) * len(sorted_attrs):
         if len(paths) == 1:
-            log.warning("_mdls_batch: unexpected mdls output for %s, skipping its metadata", paths[0])
+            log.warning(
+                "_mdls_batch: unexpected mdls output for %s, skipping its metadata", paths[0]
+            )
             return {}
-        log.warning("_mdls_batch: got %d values for %d paths, retrying in halves",
-                    len(values), len(paths))
+        log.warning(
+            "_mdls_batch: got %d values for %d paths, retrying in halves", len(values), len(paths)
+        )
         mid = len(paths) // 2
         merged = _mdls_batch(paths[:mid])
         merged.update(_mdls_batch(paths[mid:]))

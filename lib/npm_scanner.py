@@ -4,7 +4,7 @@ import re
 import shutil
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from lib.log import log
 
@@ -61,7 +61,9 @@ def find_npm():
         return found
     candidates = [
         _nvm_npm(),
-        os.path.join(HOME, "Library", "Application Support", "fnm", "aliases", "default", "bin", "npm"),
+        os.path.join(
+            HOME, "Library", "Application Support", "fnm", "aliases", "default", "bin", "npm"
+        ),
         os.path.join(HOME, ".local", "share", "fnm", "aliases", "default", "bin", "npm"),
         os.path.join(HOME, ".fnm", "aliases", "default", "bin", "npm"),
         os.path.join(HOME, ".volta", "bin", "npm"),
@@ -86,7 +88,7 @@ def _npm_env(npm):
     return env
 
 
-NOT_FOUND = ("npm was not found (checked PATH, nvm, fnm, Volta, asdf, mise and Homebrew)")
+NOT_FOUND = "npm was not found (checked PATH, nvm, fnm, Volta, asdf, mise and Homebrew)"
 
 
 def scan_npm_globals():
@@ -100,7 +102,11 @@ def scan_npm_globals():
     try:
         result = subprocess.run(
             [npm, "list", "-g", "--json", "--depth=0"],
-            capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL, env=_npm_env(npm),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            stdin=subprocess.DEVNULL,
+            env=_npm_env(npm),
         )
         data = json.loads(result.stdout)
     except subprocess.TimeoutExpired:
@@ -143,8 +149,11 @@ def scan_npm_globals():
 def _get_npm_root(npm):
     try:
         result = subprocess.run(
-            [npm, "root", "-g"], env=_npm_env(npm),
-            capture_output=True, text=True, timeout=5,
+            [npm, "root", "-g"],
+            env=_npm_env(npm),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         root = result.stdout.strip()
         if root and os.path.isdir(root):
@@ -184,7 +193,7 @@ def _get_install_date(pkg_dir):
     try:
         stat = os.stat(pkg_dir)
         ts = getattr(stat, "st_birthtime", stat.st_ctime)
-        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     except OSError as e:
         log.warning("_get_install_date: failed for %s: %s", pkg_dir, e)
         return None
@@ -201,8 +210,11 @@ def uninstall_package(name):
         return {"success": False, "error": NOT_FOUND}
     try:
         result = subprocess.run(
-            [npm, "uninstall", "-g", name], env=_npm_env(npm),
-            capture_output=True, text=True, timeout=60,
+            [npm, "uninstall", "-g", name],
+            env=_npm_env(npm),
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode == 0:
             log.info("uninstall_package (npm): successfully uninstalled %s", name)
@@ -229,15 +241,21 @@ def _batch_dir_sizes(paths):
     t0 = time.time()
     try:
         result = subprocess.run(
-            ["du", "-sk"] + valid,
-            capture_output=True, text=True, timeout=30,
+            ["du", "-sk", *valid],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         sizes = {}
         for line in result.stdout.strip().splitlines():
             parts = line.split("\t", 1)
             if len(parts) == 2:
                 sizes[parts[1]] = int(parts[0]) * 1024
-        log.debug("_batch_dir_sizes (npm): computed sizes for %d paths in %.2fs", len(sizes), time.time() - t0)
+        log.debug(
+            "_batch_dir_sizes (npm): computed sizes for %d paths in %.2fs",
+            len(sizes),
+            time.time() - t0,
+        )
         return sizes
     except Exception as e:
         log.error("_batch_dir_sizes (npm): failed: %s", e)

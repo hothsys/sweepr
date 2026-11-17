@@ -1,4 +1,5 @@
 import atexit
+import contextlib
 import json
 import mimetypes
 import os
@@ -9,23 +10,47 @@ import threading
 import time
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from lib.log import log
-from lib.sizes import disk_usage
-from lib.scanner import scan_applications, calculate_dir_size
-from lib.icons import get_icon_png
 from lib.associated_files import find_associated_files
-from lib.trash import move_to_trash, check_app_running, is_safe_to_trash, quit_app, find_login_items, delete_login_items
-from lib.brew_scanner import (scan_homebrew, scan_homebrew_quick, suggested_fix, cask_app_index,
-                              untap_if_unused, is_third_party_tap, uninstall_package as brew_uninstall)
-from lib.home_data import home_folders_for_app, external_command
-from lib.npm_scanner import scan_npm_globals, PROTECTED_PACKAGES as NPM_PROTECTED, uninstall_package as npm_uninstall
-from lib.orphan_scanner import scan_orphans
+from lib.brew_scanner import (
+    cask_app_index,
+    is_third_party_tap,
+    scan_homebrew,
+    scan_homebrew_quick,
+    suggested_fix,
+    untap_if_unused,
+)
+from lib.brew_scanner import (
+    uninstall_package as brew_uninstall,
+)
+from lib.home_data import external_command, home_folders_for_app
+from lib.icons import get_icon_png
 from lib.launchagent_scanner import scan_launch_agents, unload_agent
-from lib.storage_scanner import get_roots, list_children, stream_dir_sizes, is_in_scope
+from lib.log import log
+from lib.npm_scanner import (
+    PROTECTED_PACKAGES as NPM_PROTECTED,
+)
+from lib.npm_scanner import (
+    scan_npm_globals,
+)
+from lib.npm_scanner import (
+    uninstall_package as npm_uninstall,
+)
+from lib.orphan_scanner import scan_orphans
+from lib.scanner import calculate_dir_size, scan_applications
+from lib.sizes import disk_usage
+from lib.storage_scanner import get_roots, is_in_scope, list_children, stream_dir_sizes
+from lib.trash import (
+    check_app_running,
+    delete_login_items,
+    find_login_items,
+    is_safe_to_trash,
+    move_to_trash,
+    quit_app,
+)
 
 PORT = 47836
 BIND_HOST = "localhost"
@@ -72,11 +97,9 @@ def _code_mtime():
     was copied in) the UI says a restart is needed instead of silently running
     the old version."""
     newest = 0.0
-    for f in [BASE_DIR / "server.py"] + list((BASE_DIR / "lib").glob("*.py")):
-        try:
+    for f in [BASE_DIR / "server.py", *list((BASE_DIR / "lib").glob("*.py"))]:
+        with contextlib.suppress(OSError):
             newest = max(newest, f.stat().st_mtime)
-        except OSError:
-            pass
     return newest
 
 
@@ -84,8 +107,13 @@ _STARTED_CODE_MTIME = _code_mtime()
 _STARTED_AT = time.time()
 
 # Polled endpoints are logged at DEBUG so they don't flood the log at INFO
-_QUIET_PATHS = ("/api/apps/sizes", "/api/storage/progress", "/api/brew/status", "/api/storage/roots",
-                "/api/health")
+_QUIET_PATHS = (
+    "/api/apps/sizes",
+    "/api/storage/progress",
+    "/api/brew/status",
+    "/api/storage/roots",
+    "/api/health",
+)
 
 # Bumped whenever a cache is invalidated or a rescan starts; background work
 # started under an older generation discards its results instead of
@@ -98,7 +126,7 @@ _brew_gen = 0
 _offered_lock = threading.Lock()
 _offered_orphans = set()
 _offered_agents = {}  # plist path -> agent dict
-_offered_files = {}   # app path -> set of associated file paths
+_offered_files = {}  # app path -> set of associated file paths
 _offered_brew_leftovers = set()  # home folders found after a Homebrew uninstall
 
 
@@ -156,11 +184,14 @@ def _invalidate_apps():
 _brew_detailed = False
 _brew_error = None
 
+
 def get_brew(force_refresh=False):
     global _brew_cache, _brew_detailed, _brew_error, _brew_gen
     with _brew_lock:
         if _brew_cache is None or force_refresh:
-            log.info("get_brew: cache miss, running quick scan%s", " (forced)" if force_refresh else "")
+            log.info(
+                "get_brew: cache miss, running quick scan%s", " (forced)" if force_refresh else ""
+            )
             _brew_gen += 1
             _brew_cache = scan_homebrew_quick()
             _brew_detailed = False
@@ -190,8 +221,10 @@ def _brew_fill_details(gen):
         if full is None:
             # Keep the quick list rather than blanking the tab
             _brew_error = err
-            log.warning("_brew_fill_details: detailed scan failed, keeping quick list (%d packages)",
-                        len(_brew_cache or []))
+            log.warning(
+                "_brew_fill_details: detailed scan failed, keeping quick list (%d packages)",
+                len(_brew_cache or []),
+            )
         else:
             _brew_cache = _merge_brew_lists(_brew_cache or [], full)
             log.info("_brew_fill_details: complete (%d packages)", len(_brew_cache))
@@ -204,11 +237,16 @@ def _merge_brew_lists(quick, full):
     the quick pass instead of vanishing."""
     # keg_name covers renamed formulae, whose Cellar folder (and so the quick
     # list's name) is the old one
-    detailed = {(p["type"], p["name"]) for p in full} | {(p["type"], p["keg_name"]) for p in full if p.get("keg_name")}
+    detailed = {(p["type"], p["name"]) for p in full} | {
+        (p["type"], p["keg_name"]) for p in full if p.get("keg_name")
+    }
     kept = [dict(p, details_missing=True) for p in quick if (p["type"], p["name"]) not in detailed]
     if kept:
-        log.info("_merge_brew_lists: keeping %d package(s) brew info skipped: %s",
-                 len(kept), [p["name"] for p in kept])
+        log.info(
+            "_merge_brew_lists: keeping %d package(s) brew info skipped: %s",
+            len(kept),
+            [p["name"] for p in kept],
+        )
     return sorted(full + kept, key=lambda p: p["name"].lower())
 
 
@@ -244,13 +282,20 @@ def get_apps(force_refresh=False):
                         casks.setdefault(app_name, p["name"])
             for a in _apps_cache:
                 token = casks.get(os.path.basename(a["path"]))
-                if token and os.path.dirname(a["path"]) in ("/Applications", str(Path.home() / "Applications")):
+                if token and os.path.dirname(a["path"]) in (
+                    "/Applications",
+                    str(Path.home() / "Applications"),
+                ):
                     a["brew_cask"] = token
             _start_size_computation(_apps_cache)
         else:
             system = sum(1 for a in _apps_cache if a.get("is_system"))
-            log.debug("get_apps: cache hit (%d apps total, %d system, %d user)",
-                      len(_apps_cache), system, len(_apps_cache) - system)
+            log.debug(
+                "get_apps: cache hit (%d apps total, %d system, %d user)",
+                len(_apps_cache),
+                system,
+                len(_apps_cache) - system,
+            )
         return _apps_cache
 
 
@@ -272,6 +317,7 @@ def find_app(identifier):
 
 def _storage_scan(path):
     """Background worker: stream `du` sizes for `path` into the storage cache."""
+
     def on_child(child, size):
         with _storage_lock:
             entry = _storage_cache.get(path)
@@ -286,7 +332,9 @@ def _storage_scan(path):
             mtime = None
         with _storage_lock:
             entry = _storage_cache.setdefault(
-                path, {"sizes": {}, "complete": False, "mtime": None, "total": None, "computed_at": 0})
+                path,
+                {"sizes": {}, "complete": False, "mtime": None, "total": None, "computed_at": 0},
+            )
             if total is None:
                 total = sum(entry["sizes"].values())
             entry["complete"] = True
@@ -342,8 +390,13 @@ def _ensure_storage_scan(path):
         # Keep the previous sizes visible while rescanning instead of blanking
         # every folder to 0; pop and re-insert so FIFO eviction sees it as newest
         old = _storage_cache.pop(path, None)
-        _storage_cache[path] = {"sizes": dict(old["sizes"]) if old else {}, "complete": False,
-                                "mtime": None, "total": None, "computed_at": 0}
+        _storage_cache[path] = {
+            "sizes": dict(old["sizes"]) if old else {},
+            "complete": False,
+            "mtime": None,
+            "total": None,
+            "computed_at": 0,
+        }
         _evict_storage_cache_locked(keep=path)
     threading.Thread(target=_storage_scan, args=(path,), daemon=True).start()
     return None
@@ -381,7 +434,7 @@ def _storage_breadcrumb(path):
         rp = r["path"]
         if path == rp or path.startswith(rp + os.sep):
             crumbs = [{"label": r["label"], "path": rp}]
-            rel = path[len(rp):].strip(os.sep)
+            rel = path[len(rp) :].strip(os.sep)
             if rel:
                 acc = rp
                 for part in rel.split(os.sep):
@@ -401,7 +454,13 @@ def _warm_storage_roots():
             if p in _storage_scanning:
                 return
             _storage_scanning.add(p)
-            _storage_cache[p] = {"sizes": {}, "complete": False, "mtime": None, "total": None, "computed_at": 0}
+            _storage_cache[p] = {
+                "sizes": {},
+                "complete": False,
+                "mtime": None,
+                "total": None,
+                "computed_at": 0,
+            }
         _storage_scan(p)
 
     # Each root gets its own `du` so a fast root (Documents) resolves in well under
@@ -493,10 +552,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._try_send_error(500, "Internal error")
 
     def _try_send_error(self, status, message):
-        try:
+        # client already gone, or headers were already sent
+        with contextlib.suppress(OSError):
             self._send_error(status, message)
-        except OSError:
-            pass  # client already gone, or headers were already sent
 
     def _dispatch_get(self, path):
         if path == "/" or path == "" or path == "/static/index.html":
@@ -516,7 +574,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             restart_needed = _code_mtime() > _STARTED_CODE_MTIME
             if restart_needed:
                 log.debug("GET /api/health: code changed since start, restart needed")
-            self._send_json({"status": "ok", "started_at": _STARTED_AT, "restart_needed": restart_needed})
+            self._send_json(
+                {"status": "ok", "started_at": _STARTED_AT, "restart_needed": restart_needed}
+            )
         elif path == "/api/apps":
             apps = get_apps()
             log.info("GET /api/apps → %d apps", len(apps))
@@ -531,13 +591,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             log.debug("GET /api/apps/sizes → %d computed, complete=%s", len(sizes), _sizes_complete)
             self._send_json({"sizes": sizes, "complete": _sizes_complete})
         elif path.startswith("/api/apps/") and path.endswith("/icon"):
-            identifier = path[len("/api/apps/"):-len("/icon")]
+            identifier = path[len("/api/apps/") : -len("/icon")]
             self._handle_icon(identifier)
         elif path.startswith("/api/apps/") and path.endswith("/files"):
-            identifier = path[len("/api/apps/"):-len("/files")]
+            identifier = path[len("/api/apps/") : -len("/files")]
             self._handle_files(identifier)
         elif path.startswith("/api/apps/") and path.endswith("/running"):
-            identifier = path[len("/api/apps/"):-len("/running")]
+            identifier = path[len("/api/apps/") : -len("/running")]
             self._handle_running(identifier)
         elif path == "/api/brew":
             packages = get_brew()
@@ -548,8 +608,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             log.info("GET /api/brew/refresh → %d packages", len(packages))
             self._send_json({"packages": packages})
         elif path == "/api/brew/status":
-            self._send_json({"detailed": _brew_detailed, "error": _brew_error,
-                             "fix_command": suggested_fix(_brew_error)})
+            self._send_json(
+                {
+                    "detailed": _brew_detailed,
+                    "error": _brew_error,
+                    "fix_command": suggested_fix(_brew_error),
+                }
+            )
         elif path == "/api/npm":
             packages = get_npm()
             log.info("GET /api/npm → %d packages", len(packages))
@@ -580,7 +645,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 # partial so it climbs immediately instead of sitting on a spinner
                 # while its own (slow) walk of ~/Library finishes.
                 home_child_total = sum(
-                    c["total"] for r in roots
+                    c["total"]
+                    for r in roots
                     for c in [_storage_cache.get(r["path"])]
                     if c and c["complete"] and r["path"].startswith(home + os.sep)
                 )
@@ -606,21 +672,21 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _dispatch_post(self, path):
         if path.startswith("/api/apps/") and path.endswith("/trash"):
-            identifier = path[len("/api/apps/"):-len("/trash")]
+            identifier = path[len("/api/apps/") : -len("/trash")]
             self._handle_trash(identifier)
         elif path.startswith("/api/apps/") and path.endswith("/reveal"):
-            identifier = path[len("/api/apps/"):-len("/reveal")]
+            identifier = path[len("/api/apps/") : -len("/reveal")]
             self._handle_reveal(identifier)
         elif path.startswith("/api/apps/") and path.endswith("/launch-uninstaller"):
-            identifier = path[len("/api/apps/"):-len("/launch-uninstaller")]
+            identifier = path[len("/api/apps/") : -len("/launch-uninstaller")]
             self._handle_launch_uninstaller(identifier)
         elif path == "/api/brew/leftovers/trash":
             self._handle_brew_leftovers_trash()
         elif path.startswith("/api/brew/") and path.endswith("/uninstall"):
-            pkg_name = path[len("/api/brew/"):-len("/uninstall")]
+            pkg_name = path[len("/api/brew/") : -len("/uninstall")]
             self._handle_brew_uninstall(pkg_name)
         elif path.startswith("/api/npm/") and path.endswith("/uninstall"):
-            pkg_name = path[len("/api/npm/"):-len("/uninstall")]
+            pkg_name = path[len("/api/npm/") : -len("/uninstall")]
             self._handle_npm_uninstall(pkg_name)
         elif path == "/api/agents/trash":
             self._handle_agent_trash()
@@ -663,7 +729,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         with _offered_lock:
             _offered_files[app["path"]] = {f["path"] for f in files if not f.get("protected")}
         total = sum(f["size"] for f in files)
-        log.info("_handle_files: found %d files (%.1f KB) for '%s'", len(files), total / 1024, app["name"])
+        log.info(
+            "_handle_files: found %d files (%.1f KB) for '%s'",
+            len(files),
+            total / 1024,
+            app["name"],
+        )
         self._send_json({"bundle_id": app["bundle_id"], "files": files, "total_size": total})
 
     def _handle_running(self, identifier):
@@ -675,12 +746,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         # uninstaller, Finder) while its detail page is open
         exists = os.path.lexists(app["path"])
         if not exists:
-            log.info("_handle_running: '%s' no longer exists at %s, dropping the app list", app["name"], app["path"])
+            log.info(
+                "_handle_running: '%s' no longer exists at %s, dropping the app list",
+                app["name"],
+                app["path"],
+            )
             _invalidate_apps()
             self._send_json({"running": False, "exists": False})
             return
         running = check_app_running(app["path"])
-        log.debug("_handle_running: '%s' is %s", app["name"], "running" if running else "not running")
+        log.debug(
+            "_handle_running: '%s' is %s", app["name"], "running" if running else "not running"
+        )
         self._send_json({"running": running, "exists": True})
 
     def _handle_trash(self, identifier):
@@ -699,9 +776,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         if app.get("brew_cask") and self._body.get("include_app", True):
             # Trashing it would leave the cask registered; `brew upgrade` reinstalls it
-            log.warning("_handle_trash: blocked, '%s' is managed by Homebrew cask %s", app["name"], app["brew_cask"])
-            self._send_error(409, f"{app['name']} was installed with Homebrew. Uninstall it with Homebrew "
-                                  f"(cask {app['brew_cask']}) so it isn't reinstalled by brew upgrade.")
+            log.warning(
+                "_handle_trash: blocked, '%s' is managed by Homebrew cask %s",
+                app["name"],
+                app["brew_cask"],
+            )
+            self._send_error(
+                409,
+                f"{app['name']} was installed with Homebrew. Uninstall it with Homebrew "
+                f"(cask {app['brew_cask']}) so it isn't reinstalled by brew upgrade.",
+            )
             return
 
         data = self._body
@@ -714,12 +798,21 @@ class RequestHandler(BaseHTTPRequestHandler):
             offered = _offered_files.get(app["path"])
         if offered is None:
             log.info("_handle_trash: no file list cached for '%s', scanning now", app["name"])
-            offered = {f["path"] for f in find_associated_files(app["bundle_id"], app["name"], app["path"],
-                                                                _other_apps(app)) if not f.get("protected")}
+            offered = {
+                f["path"]
+                for f in find_associated_files(
+                    app["bundle_id"], app["name"], app["path"], _other_apps(app)
+                )
+                if not f.get("protected")
+            }
         unknown = [fp for fp in file_paths if fp not in offered]
         if unknown:
-            log.warning("_handle_trash: rejected %d path(s) not associated with '%s': %s",
-                        len(unknown), app["name"], unknown[:5])
+            log.warning(
+                "_handle_trash: rejected %d path(s) not associated with '%s': %s",
+                len(unknown),
+                app["name"],
+                unknown[:5],
+            )
             self._send_error(403, "Request includes files that are not associated with this app")
             return
         for fp in file_paths:
@@ -733,7 +826,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             # can't be stopped, remove nothing rather than half-remove it.
             quit_info = quit_app(app["path"])
             if not quit_info["ok"]:
-                log.error("_handle_trash: aborting removal of '%s': %s", app["name"], quit_info["error"])
+                log.error(
+                    "_handle_trash: aborting removal of '%s': %s", app["name"], quit_info["error"]
+                )
                 self._send_error(409, quit_info["error"])
                 return
             # Matched now, deleted after the move succeeds (see find_login_items)
@@ -752,10 +847,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             total_freed += app.get("size") or 0
         result["total_freed"] = total_freed
         result["quit"] = quit_info
-        result["login_items_removed"] = delete_login_items(login_items) if app["path"] in success_set else []
+        result["login_items_removed"] = (
+            delete_login_items(login_items) if app["path"] in success_set else []
+        )
 
-        log.info("_handle_trash: done: %d succeeded, %d failed, %.1f MB freed",
-                 len(result["success"]), len(result["failed"]), total_freed / 1024 / 1024)
+        log.info(
+            "_handle_trash: done: %d succeeded, %d failed, %.1f MB freed",
+            len(result["success"]),
+            len(result["failed"]),
+            total_freed / 1024 / 1024,
+        )
         if result["failed"]:
             for f in result["failed"]:
                 log.error("_handle_trash: failed to trash %s: %s", f["path"], f["error"])
@@ -798,11 +899,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             kind = uninstaller["type"]
             path = uninstaller["path"]
-            log.info("_handle_launch_uninstaller: launching %s uninstaller for '%s': %s",
-                     kind, app["name"], path)
-            if kind == "app":
-                subprocess.Popen(["open", path])
-            elif kind == "alias":
+            log.info(
+                "_handle_launch_uninstaller: launching %s uninstaller for '%s': %s",
+                kind,
+                app["name"],
+                path,
+            )
+            if kind == "app" or kind == "alias":
                 subprocess.Popen(["open", path])
             elif kind == "executable":
                 subprocess.Popen([path])
@@ -823,9 +926,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         # Only packages the scan listed; this also keeps option-like names
         # ("--force") from ever reaching brew's argument list
         with _brew_lock:
-            pkg = next((p for p in (_brew_cache or []) if p["name"] == pkg_name and p["type"] == pkg_type), None)
+            pkg = next(
+                (p for p in (_brew_cache or []) if p["name"] == pkg_name and p["type"] == pkg_type),
+                None,
+            )
         if not pkg:
-            log.warning("_handle_brew_uninstall: rejected %s (%s), not in the scanned list", pkg_name, pkg_type)
+            log.warning(
+                "_handle_brew_uninstall: rejected %s (%s), not in the scanned list",
+                pkg_name,
+                pkg_type,
+            )
             self._send_error(403, "Package is not in the scanned Homebrew list")
             return
         if pkg_type == "cask":
@@ -837,7 +947,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                     if not quit_info["ok"]:
                         self._send_error(409, quit_info["error"])
                         return
-        log.info("_handle_brew_uninstall: uninstalling %s (%s, zap=%s, untap=%s)", pkg_name, pkg_type, zap, untap)
+        log.info(
+            "_handle_brew_uninstall: uninstalling %s (%s, zap=%s, untap=%s)",
+            pkg_name,
+            pkg_type,
+            zap,
+            untap,
+        )
         result = brew_uninstall(pkg_name, pkg_type, zap=zap)
         _invalidate_brew()
         if not result["success"]:
@@ -859,9 +975,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             size, _ = disk_usage(path)
             leftovers.append({"path": path, "size": size})
         with _offered_lock:
-            _offered_brew_leftovers.update(l["path"] for l in leftovers)
+            _offered_brew_leftovers.update(leftover["path"] for leftover in leftovers)
         if leftovers:
-            log.info("_handle_brew_uninstall: leftovers for %s: %s", pkg_name, [l["path"] for l in leftovers])
+            log.info(
+                "_handle_brew_uninstall: leftovers for %s: %s",
+                pkg_name,
+                [leftover["path"] for leftover in leftovers],
+            )
         result["leftovers"] = leftovers
         # The app (for casks) is gone; make the Apps tab rescan
         if pkg_type == "cask":
@@ -882,8 +1002,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         result = _trash(paths)
         with _offered_lock:
             _offered_brew_leftovers.difference_update(result["success"])
-        log.info("_handle_brew_leftovers_trash: %d succeeded, %d failed",
-                 len(result["success"]), len(result["failed"]))
+        log.info(
+            "_handle_brew_leftovers_trash: %d succeeded, %d failed",
+            len(result["success"]),
+            len(result["failed"]),
+        )
         self._send_json(result)
 
     def _handle_npm_uninstall(self, pkg_name):
@@ -916,10 +1039,17 @@ class RequestHandler(BaseHTTPRequestHandler):
         orphans = scan_orphans(known_ids, known_names)
         with _offered_lock:
             _offered_orphans.clear()
-            _offered_orphans.update(f["path"] for g in orphans for a in g["apps"] for f in a["files"]
-                                    if not f.get("protected"))
+            _offered_orphans.update(
+                f["path"]
+                for g in orphans
+                for a in g["apps"]
+                for f in a["files"]
+                if not f.get("protected")
+            )
         total_size = sum(g["total_size"] for g in orphans)
-        log.info("_handle_orphans: found %d groups, %.1f MB", len(orphans), total_size / 1024 / 1024)
+        log.info(
+            "_handle_orphans: found %d groups, %.1f MB", len(orphans), total_size / 1024 / 1024
+        )
         self._send_json({"groups": orphans, "total_size": total_size})
 
     def _handle_orphan_trash(self):
@@ -931,8 +1061,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         with _offered_lock:
             unknown = [p for p in paths if p not in _offered_orphans]
         if unknown:
-            log.warning("_handle_orphan_trash: rejected %d path(s) not in the last orphan scan: %s",
-                        len(unknown), unknown[:5])
+            log.warning(
+                "_handle_orphan_trash: rejected %d path(s) not in the last orphan scan: %s",
+                len(unknown),
+                unknown[:5],
+            )
             self._send_error(403, "Request includes paths that were not found by the orphan scan")
             return
 
@@ -940,8 +1073,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         result = _trash(paths)
         with _offered_lock:
             _offered_orphans.difference_update(result["success"])
-        log.info("_handle_orphan_trash: %d succeeded, %d failed",
-                 len(result["success"]), len(result["failed"]))
+        log.info(
+            "_handle_orphan_trash: %d succeeded, %d failed",
+            len(result["success"]),
+            len(result["failed"]),
+        )
         self._send_json(result)
 
     def _handle_agent_trash(self):
@@ -952,9 +1088,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         with _offered_lock:
             agents = [_offered_agents.get(p) for p in paths]
         if None in agents:
-            unknown = [p for p, a in zip(paths, agents) if a is None]
-            log.warning("_handle_agent_trash: rejected %d path(s) not in the last agent scan: %s",
-                        len(unknown), unknown[:5])
+            unknown = [p for p, a in zip(paths, agents, strict=False) if a is None]
+            log.warning(
+                "_handle_agent_trash: rejected %d path(s) not in the last agent scan: %s",
+                len(unknown),
+                unknown[:5],
+            )
             self._send_error(403, "Request includes paths that were not found by the agent scan")
             return
 
@@ -978,13 +1117,22 @@ class RequestHandler(BaseHTTPRequestHandler):
                 continue
             unloaded, err = unload_agent(agent["label"], agent["scope"])
             if not unloaded:
-                warnings.append({"path": path, "label": agent["label"],
-                                 "warning": f"Still running until restart (could not unload: {err})"})
+                warnings.append(
+                    {
+                        "path": path,
+                        "label": agent["label"],
+                        "warning": f"Still running until restart (could not unload: {err})",
+                    }
+                )
         with _offered_lock:
             for p in success:
                 _offered_agents.pop(p, None)
-        log.info("_handle_agent_trash: %d succeeded, %d failed, %d still loaded",
-                 len(success), len(failed), len(warnings))
+        log.info(
+            "_handle_agent_trash: %d succeeded, %d failed, %d still loaded",
+            len(success),
+            len(failed),
+            len(warnings),
+        )
         self._send_json({"success": success, "failed": failed, "warnings": warnings})
 
     def _body_path(self):
@@ -1027,14 +1175,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not is_in_scope(parent) or parent == norm:
             parent = None
 
-        log.info("_handle_storage_list: %s → %d entries (complete=%s)", norm, len(entries), complete)
-        self._send_json({
-            "path": norm,
-            "parent": parent,
-            "breadcrumb": _storage_breadcrumb(norm),
-            "entries": entries,
-            "complete": complete,
-        })
+        log.info(
+            "_handle_storage_list: %s → %d entries (complete=%s)", norm, len(entries), complete
+        )
+        self._send_json(
+            {
+                "path": norm,
+                "parent": parent,
+                "breadcrumb": _storage_breadcrumb(norm),
+                "entries": entries,
+                "complete": complete,
+            }
+        )
 
     def _handle_storage_progress(self):
         norm = self._body_path()
@@ -1045,7 +1197,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             c = _storage_cache.get(norm) or {}
             sizes = dict(c.get("sizes", {}))
             complete = bool(c.get("complete"))
-        log.debug("_handle_storage_progress: %s → %d sized, complete=%s", norm, len(sizes), complete)
+        log.debug(
+            "_handle_storage_progress: %s → %d sized, complete=%s", norm, len(sizes), complete
+        )
         self._send_json({"sizes": sizes, "complete": complete})
 
     def _handle_storage_reveal(self):
@@ -1105,10 +1259,8 @@ def write_pid():
 
 
 def cleanup_pid():
-    try:
+    with contextlib.suppress(OSError):
         os.unlink(PID_FILE)
-    except OSError:
-        pass
 
 
 def check_already_running():
@@ -1133,7 +1285,9 @@ def main():
     atexit.register(cleanup_pid)
 
     log.info("=" * 60)
-    log.info("Sweepr starting: Python %s, port %d, pid %d", sys.version.split()[0], PORT, os.getpid())
+    log.info(
+        "Sweepr starting: Python %s, port %d, pid %d", sys.version.split()[0], PORT, os.getpid()
+    )
     log.info("Log file: %s", (BASE_DIR / "sweepr.log"))
 
     server = ThreadingHTTPServer((BIND_HOST, PORT), RequestHandler)
@@ -1147,7 +1301,9 @@ def main():
     threading.Thread(target=_warm_storage_roots, daemon=True).start()
 
     if "--no-browser" not in sys.argv:
-        threading.Thread(target=lambda: webbrowser.open(f"http://{BIND_HOST}:{PORT}"), daemon=True).start()
+        threading.Thread(
+            target=lambda: webbrowser.open(f"http://{BIND_HOST}:{PORT}"), daemon=True
+        ).start()
 
     def shutdown(signum, frame):
         log.info("Sweepr shutting down (signal %d)", signum)
