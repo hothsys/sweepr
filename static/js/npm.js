@@ -8,29 +8,28 @@ async function fetchNpm(refresh) {
     return;
   }
   const gen = ++fetchGeneration;
-  const url = refresh ? '/api/npm/refresh' : '/api/npm';
+  const url = refresh ? "/api/npm/refresh" : "/api/npm";
   try {
     const data = await fetchJson(url);
     npmPackages = data.packages || [];
-    if (data.error) showToast(`npm scan failed: ${data.error}`, 'error');
+    if (data.error) showToast(`npm scan failed: ${data.error}`, "error");
   } catch (e) {
-    showToast(`Could not load npm packages: ${e.message}`, 'error');
+    showToast(`Could not load npm packages: ${e.message}`, "error");
     return;
   }
-  if (gen === fetchGeneration && currentTab === 'npm') renderNpmList();
+  if (gen === fetchGeneration && currentTab === "npm") renderNpmList();
 }
 
 function getFilteredNpm() {
   let filtered = [...npmPackages];
   const q = searchBox.value.toLowerCase().trim();
   if (q) {
-    filtered = filtered.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.description || '').toLowerCase().includes(q)
+    filtered = filtered.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q),
     );
   }
   const sort = sortSelect.value;
-  if (sort === 'size') {
+  if (sort === "size") {
     filtered.sort((a, b) => (b.size || 0) - (a.size || 0));
   } else {
     filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -40,25 +39,26 @@ function getFilteredNpm() {
 
 function renderNpmList() {
   const filtered = getFilteredNpm();
-  let html = '';
+  let html = "";
   for (const pkg of filtered) {
-    const sel = selectedNpm && selectedNpm.name === pkg.name ? ' selected' : '';
-    const meta = pkg.version + (pkg.installed_at ? ' · ' + formatDate(pkg.installed_at) : '');
+    const sel = selectedNpm && selectedNpm.name === pkg.name ? " selected" : "";
+    const meta = pkg.version + (pkg.installed_at ? ` · ${formatDate(pkg.installed_at)}` : "");
     html += `<div class="app-item${sel}" data-id="${escHtml(pkg.name)}" onclick="selectNpm(this.dataset.id)">
       <div class="brew-icon">&#9729;</div>
       <div class="app-info">
-        <div class="app-name">${escHtml(pkg.name)}${pkg.protected ? '<span class="system-badge">Node.js</span>' : ''}</div>
+        <div class="app-name">${escHtml(pkg.name)}${pkg.protected ? '<span class="system-badge">Node.js</span>' : ""}</div>
         <div class="app-meta">${escHtml(meta)}</div>
       </div>
-      <div class="app-size">${pkg.size ? formatBytes(pkg.size) : ''}</div>
+      <div class="app-size">${pkg.size ? formatBytes(pkg.size) : ""}</div>
     </div>`;
   }
   appListEl.innerHTML = html;
-  document.getElementById('tabCount').textContent = filtered.length + ' package' + (filtered.length !== 1 ? 's' : '');
+  document.getElementById("tabCount").textContent =
+    `${filtered.length} package${filtered.length !== 1 ? "s" : ""}`;
 }
 
 function selectNpm(name) {
-  selectedNpm = npmPackages.find(p => p.name === name);
+  selectedNpm = npmPackages.find((p) => p.name === name);
   if (!selectedNpm) return;
   renderNpmList();
   renderNpmDetail();
@@ -74,17 +74,17 @@ function renderNpmDetail() {
       <div>
         <div class="detail-title">${escHtml(pkg.name)}</div>
         <div class="detail-version">${escHtml(pkg.version)}</div>
-        ${pkg.description ? `<div class="detail-desc">${escHtml(pkg.description)}</div>` : ''}
+        ${pkg.description ? `<div class="detail-desc">${escHtml(pkg.description)}</div>` : ""}
         <div class="detail-dates">
-          ${pkg.installed_at ? 'Installed: ' + formatFullDate(pkg.installed_at) : ''}
-          ${pkg.size ? '<br>Size: ' + formatBytes(pkg.size) : ''}
+          ${pkg.installed_at ? `Installed: ${formatFullDate(pkg.installed_at)}` : ""}
+          ${pkg.size ? `<br>Size: ${formatBytes(pkg.size)}` : ""}
         </div>
       </div>
     </div>
     ${renderRiskBanner(getNpmRisk(pkg))}
     <div class="action-bar">
       <div class="total-size">Uninstall via <span>npm uninstall -g ${escHtml(pkg.name)}</span></div>
-      <button class="btn-uninstall" ${pkg.protected ? 'disabled' : 'onclick="confirmNpmUninstall()"'}>${pkg.protected ? 'Part of Node.js' : 'Uninstall'}</button>
+      <button class="btn-uninstall" ${pkg.protected ? "disabled" : 'onclick="confirmNpmUninstall()"'}>${pkg.protected ? "Part of Node.js" : "Uninstall"}</button>
     </div>
   `;
 }
@@ -102,23 +102,30 @@ function confirmNpmUninstall() {
 }
 
 async function doNpmUninstall() {
-  document.querySelector('.modal-overlay')?.remove();
+  document.querySelector(".modal-overlay")?.remove();
   const pkg = selectedNpm;
   if (!pkg) return;
 
-  const btn = detailPanel.querySelector('.btn-uninstall');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Uninstalling...'; }
+  const btn = detailPanel.querySelector(".btn-uninstall");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Uninstalling...';
+  }
 
   try {
     await postJson(`/api/npm/${encodeURIComponent(pkg.name)}/uninstall`);
-    showToast(`Uninstalled ${pkg.name}`, 'success');
+    showToast(`Uninstalled ${pkg.name}`, "success");
     if (selectedNpm === pkg) {
       selectedNpm = null;
-      if (currentTab === 'npm') detailPanel.innerHTML = '<div class="detail-empty">Select a package to view details</div>';
+      if (currentTab === "npm")
+        detailPanel.innerHTML = '<div class="detail-empty">Select a package to view details</div>';
     }
     await fetchNpm(true);
   } catch (e) {
-    showToast(`Uninstall failed: ${e.message}`, 'error');
-    if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Uninstall'; }
+    showToast(`Uninstall failed: ${e.message}`, "error");
+    if (btn?.isConnected) {
+      btn.disabled = false;
+      btn.textContent = "Uninstall";
+    }
   }
 }

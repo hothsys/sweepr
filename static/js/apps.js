@@ -2,20 +2,20 @@
 
 async function fetchApps(refresh) {
   const gen = ++fetchGeneration;
-  const url = refresh ? '/api/apps/refresh' : '/api/apps';
+  const url = refresh ? "/api/apps/refresh" : "/api/apps";
   let data;
   try {
     data = await fetchJson(url);
   } catch (e) {
-    showToast(`Could not load apps: ${e.message}`, 'error');
+    showToast(`Could not load apps: ${e.message}`, "error");
     return;
   }
   apps = data.apps || [];
   indexApps();
   // Keep the selection pointing at the fresh object so size updates reach it
   const previous = selectedApp;
-  if (selectedApp) selectedApp = apps.find(a => a.path === selectedApp.path) || null;
-  if (gen === fetchGeneration && currentTab === 'apps') {
+  if (selectedApp) selectedApp = apps.find((a) => a.path === selectedApp.path) || null;
+  if (gen === fetchGeneration && currentTab === "apps") {
     renderAppList();
     if (previous && !selectedApp) {
       // The app being viewed was removed outside Sweepr: don't leave its buttons up
@@ -44,20 +44,19 @@ function getFilteredApps() {
   let filtered = [...apps];
   const q = searchBox.value.toLowerCase().trim();
   if (q) {
-    filtered = filtered.filter(a =>
-      a.name.toLowerCase().includes(q) ||
-      a.bundle_id.toLowerCase().includes(q)
+    filtered = filtered.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.bundle_id.toLowerCase().includes(q),
     );
   }
   if (hideSystem.checked) {
-    filtered = filtered.filter(a => !a.is_system);
+    filtered = filtered.filter((a) => !a.is_system);
   }
   const sort = sortSelect.value;
-  if (sort === 'size') {
+  if (sort === "size") {
     filtered.sort((a, b) => (b.size || 0) - (a.size || 0));
-  } else if (sort === 'updated') {
-    filtered.sort((a, b) => (b.last_updated || '').localeCompare(a.last_updated || ''));
-  } else if (sort === 'last_used') {
+  } else if (sort === "updated") {
+    filtered.sort((a, b) => (b.last_updated || "").localeCompare(a.last_updated || ""));
+  } else if (sort === "last_used") {
     filtered.sort((a, b) => {
       if (!a.last_used && !b.last_used) return a.name.localeCompare(b.name);
       if (!a.last_used) return 1;
@@ -77,30 +76,37 @@ function appIdentifier(app) {
 
 function renderAppList() {
   const filtered = getFilteredApps();
-  let html = '';
+  let html = "";
   for (const app of filtered) {
     const id = appIdentifier(app);
-    const sel = selectedApp && appIdentifier(selectedApp) === id ? ' selected' : '';
-    const sys = app.is_system ? ' system' : '';
+    const sel = selectedApp && appIdentifier(selectedApp) === id ? " selected" : "";
+    const sys = app.is_system ? " system" : "";
     const iconUrl = `/api/apps/${encodeURIComponent(id)}/icon`;
-    const meta = app.version + (app.last_used ? ' · Used ' + formatDate(app.last_used) : app.last_updated ? ' · Released ' + formatDate(app.last_updated) : '');
+    const meta =
+      app.version +
+      (app.last_used
+        ? ` · Used ${formatDate(app.last_used)}`
+        : app.last_updated
+          ? ` · Released ${formatDate(app.last_updated)}`
+          : "");
     html += `<div class="app-item${sel}${sys}" data-id="${escHtml(id)}" onclick="selectApp(this.dataset.id)">
       <div class="app-icon">
-        ${app.webloc ? '<div class="fallback">&#127760;</div>' : app.leftover ? '<div class="fallback">&#128448;</div>' : app.icon_file === '' ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
+        ${app.webloc ? '<div class="fallback">&#127760;</div>' : app.leftover ? '<div class="fallback">&#128448;</div>' : app.icon_file === "" ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
       </div>
       <div class="app-info">
-        <div class="app-name">${escHtml(app.name)}${app.is_system ? '<span class="system-badge">System</span>' : ''}${app.webloc ? '<span class="brew-type-badge formula" style="background:var(--text-secondary)">webloc</span>' : ''}${app.leftover ? '<span class="system-badge" style="background:var(--danger)">leftover</span>' : ''}</div>
+        <div class="app-name">${escHtml(app.name)}${app.is_system ? '<span class="system-badge">System</span>' : ""}${app.webloc ? '<span class="brew-type-badge formula" style="background:var(--text-secondary)">webloc</span>' : ""}${app.leftover ? '<span class="system-badge" style="background:var(--danger)">leftover</span>' : ""}</div>
         <div class="app-meta">${escHtml(meta)}</div>
       </div>
-      <div class="app-size">${app.size ? formatBytes(app.size) : '—'}</div>
+      <div class="app-size">${app.size ? formatBytes(app.size) : "—"}</div>
     </div>`;
   }
   appListEl.innerHTML = html;
-  document.getElementById('tabCount').textContent = filtered.length + ' app' + (filtered.length !== 1 ? 's' : '');
+  document.getElementById("tabCount").textContent =
+    `${filtered.length} app${filtered.length !== 1 ? "s" : ""}`;
 }
 
 async function selectApp(id) {
-  const app = apps.find(a => appIdentifier(a) === id);
+  const app = apps.find((a) => appIdentifier(a) === id);
   if (!app) return;
   selectedApp = app;
   renderAppList();
@@ -120,10 +126,10 @@ async function selectApp(id) {
     files = filesData.files || [];
     app._running = runningData.running;
   } catch (e) {
-    if (selectedApp === app) showToast(`Could not load associated files: ${e.message}`, 'error');
+    if (selectedApp === app) showToast(`Could not load associated files: ${e.message}`, "error");
   }
   // Another app was clicked, or the tab changed, while this was loading
-  if (selectedApp !== app || currentTab !== 'apps') return;
+  if (selectedApp !== app || currentTab !== "apps") return;
   isLoadingFiles = false;
   associatedFiles = files;
   renderDetail();
@@ -144,7 +150,7 @@ function watchRunning(app) {
   const tick = async () => {
     if (token !== _runningWatchGen || selectedApp !== app) return;
     // Paused (but still scheduled) while the page is hidden or another tab is open
-    if (!document.hidden && currentTab === 'apps' && !isRemoving) {
+    if (!document.hidden && currentTab === "apps" && !isRemoving) {
       try {
         const data = await fetchJson(`/api/apps/${encodeURIComponent(appIdentifier(app))}/running`);
         if (token !== _runningWatchGen || selectedApp !== app) return;
@@ -168,15 +174,15 @@ function watchRunning(app) {
 // The app vanished while its page was open (its own uninstaller, Finder, another
 // tool). Drop it, say so, and point at the leftovers it usually leaves behind.
 function appRemovedElsewhere(app) {
-  apps = apps.filter(a => a !== app);
+  apps = apps.filter((a) => a !== app);
   indexApps();
   selectedApp = null;
   associatedFiles = [];
-  if (currentTab === 'apps') {
+  if (currentTab === "apps") {
     renderAppList();
     renderUninstalled(app);
   }
-  showToast(`${app.name} was uninstalled`, 'success');
+  showToast(`${app.name} was uninstalled`, "success");
 }
 
 function renderUninstalled(app, viaHomebrew) {
@@ -186,12 +192,14 @@ function renderUninstalled(app, viaHomebrew) {
       <div>
         <div class="detail-title">${escHtml(app.name)}</div>
         <div class="detail-version">No longer installed</div>
-        <div class="detail-dates">${viaHomebrew
-          ? `Uninstalled with Homebrew (cask ${escHtml(app.brew_cask)}), so <code>brew upgrade</code> won't bring it back.`
-          : `${escHtml(shortenPath(app.path))} is gone; it was removed outside Sweepr, for example by its own uninstaller.`}</div>
+        <div class="detail-dates">${
+          viaHomebrew
+            ? `Uninstalled with Homebrew (cask ${escHtml(app.brew_cask)}), so <code>brew upgrade</code> won't bring it back.`
+            : `${escHtml(shortenPath(app.path))} is gone; it was removed outside Sweepr, for example by its own uninstaller.`
+        }</div>
       </div>
     </div>
-    ${renderRiskBanner({ level: 'low', reason: 'Uninstallers often leave preferences and caches behind. They now show up in the Orphans tab, where you can review and remove them' })}
+    ${renderRiskBanner({ level: "low", reason: "Uninstallers often leave preferences and caches behind. They now show up in the Orphans tab, where you can review and remove them" })}
     <div class="action-bar">
       <div class="total-size"></div>
       <button class="btn-refresh" onclick="switchTab('orphans')">Check Orphans for leftovers</button>
@@ -200,10 +208,11 @@ function renderUninstalled(app, viaHomebrew) {
 }
 
 function updateRunningBadge(app) {
-  const title = detailPanel.querySelector('.detail-title');
+  const title = detailPanel.querySelector(".detail-title");
   if (!title || selectedApp !== app) return;
-  title.querySelector('.running-badge')?.remove();
-  if (app._running) title.insertAdjacentHTML('beforeend', ' <span class="running-badge">Running</span>');
+  title.querySelector(".running-badge")?.remove();
+  if (app._running)
+    title.insertAdjacentHTML("beforeend", ' <span class="running-badge">Running</span>');
 }
 
 function renderDetailLoading() {
@@ -213,13 +222,13 @@ function renderDetailLoading() {
   detailPanel.innerHTML = `
     <div class="detail-header">
       <div class="detail-icon">
-        ${app.icon_file === '' ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
+        ${app.icon_file === "" ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
       </div>
       <div>
         <div class="detail-title">${escHtml(app.name)}</div>
-        <div class="detail-version">${escHtml(app.version)}${app.category ? ' · ' + escHtml(app.category) : ''}</div>
+        <div class="detail-version">${escHtml(app.version)}${app.category ? ` · ${escHtml(app.category)}` : ""}</div>
         <div class="detail-path">${escHtml(app.path)}</div>
-        <div class="detail-size">${app.size ? formatBytes(app.size) : 'Calculating...'}</div>
+        <div class="detail-size">${app.size ? formatBytes(app.size) : "Calculating..."}</div>
         <div class="detail-dates">${formatDetailDates(app)}</div>
       </div>
     </div>
@@ -236,7 +245,7 @@ function renderDetail() {
   }
   const id = appIdentifier(app);
   const iconUrl = `/api/apps/${encodeURIComponent(id)}/icon`;
-  const runBadge = app._running ? '<span class="running-badge">Running</span>' : '';
+  const runBadge = app._running ? '<span class="running-badge">Running</span>' : "";
 
   if (app.webloc) {
     detailPanel.innerHTML = `
@@ -245,9 +254,13 @@ function renderDetail() {
         <div>
           <div class="detail-title">${escHtml(app.name)}</div>
           <div class="detail-version">Web Shortcut</div>
-          <div class="detail-desc">${app.webloc_url ? (/^https?:\/\//i.test(app.webloc_url)
-            ? `<a href="${escHtml(app.webloc_url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(app.webloc_url)}</a>`
-            : escHtml(app.webloc_url)) : ''}</div>
+          <div class="detail-desc">${
+            app.webloc_url
+              ? /^https?:\/\//i.test(app.webloc_url)
+                ? `<a href="${escHtml(app.webloc_url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(app.webloc_url)}</a>`
+                : escHtml(app.webloc_url)
+              : ""
+          }</div>
         </div>
       </div>
       <div class="section-title">File</div>
@@ -275,7 +288,7 @@ function renderDetail() {
         <div>
           <div class="detail-title">${escHtml(app.name)}</div>
           <div class="detail-version">Leftover folder — app was uninstalled but this folder was left behind</div>
-          <div class="detail-size">${app.size ? formatBytes(app.size) : 'Calculating...'}</div>
+          <div class="detail-size">${app.size ? formatBytes(app.size) : "Calculating..."}</div>
         </div>
       </div>
       <div class="section-title">Location</div>
@@ -283,20 +296,20 @@ function renderDetail() {
         <div class="file-item">
           <span class="file-category">Leftover</span>
           <span class="file-path">${escHtml(app.path)}</span>
-          <span class="file-size">${app.size ? formatBytes(app.size) : '—'}</span>
+          <span class="file-size">${app.size ? formatBytes(app.size) : "—"}</span>
           <button class="btn-refresh" style="margin-left:10px;padding:4px 10px;font-size:14px" onclick="revealInFinder()">Show in Finder</button>
         </div>
       </div>
       ${renderRiskBanner(getAppRisk(app))}
       <div class="action-bar">
-        <div class="total-size">Total: ${app.size ? formatBytes(app.size) : '—'}</div>
+        <div class="total-size">Total: ${app.size ? formatBytes(app.size) : "—"}</div>
         <button class="btn-trash" onclick="confirmTrash()">Remove</button>
       </div>
     `;
     return;
   }
 
-  let filesHtml = '';
+  let filesHtml = "";
   if (associatedFiles.length === 0) {
     filesHtml = '<div class="loading-files">No associated files found</div>';
   } else {
@@ -305,51 +318,53 @@ function renderDetail() {
       const f = associatedFiles[i];
       // Files also used by another installed copy of the app start unchecked;
       // containers macOS protects can't be removed at all
-      const shared = f.shared_with && f.shared_with.length;
+      const shared = f.shared_with?.length;
       filesHtml += `<div class="file-item">
-        <input type="checkbox" ${f.protected ? 'disabled' : shared ? '' : 'checked'} data-idx="${i}">
+        <input type="checkbox" ${f.protected ? "disabled" : shared ? "" : "checked"} data-idx="${i}">
         <span class="file-category">${escHtml(f.category)}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(', '))}">shared</span>` : ''}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${shared ? ` <span class="dep-badge" title="Also used by ${escHtml(f.shared_with.join(", "))}">shared</span>` : ""}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ""}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
     }
-    filesHtml += '</div>';
+    filesHtml += "</div>";
   }
 
   // Computed from the data, not the DOM: the panel still holds the previous app's
   // checkboxes at this point, whose indexes may not exist in associatedFiles
   const totalSelected = associatedFiles
-    .filter(f => !f.protected && !(f.shared_with && f.shared_with.length))
+    .filter((f) => !f.protected && !f.shared_with?.length)
     .reduce((sum, f) => sum + (f.size || 0), 0);
   const canTrash = !app.is_system && !app.is_self && !isRemoving;
 
   detailPanel.innerHTML = `
     <div class="detail-header">
       <div class="detail-icon">
-        ${app.icon_file === '' ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
+        ${app.icon_file === "" ? '<div class="fallback">&#9634;</div>' : `<img src="${iconUrl}" onerror="this.parentElement.innerHTML='<div class=fallback>&#9634;</div>'">`}
       </div>
       <div>
         <div class="detail-title">${escHtml(app.name)} ${runBadge}</div>
-        <div class="detail-version">${escHtml(app.version)}${app.category ? ' · ' + escHtml(app.category) : ''}</div>
-        <div class="detail-size">${app.size ? formatBytes(app.size) : 'Calculating...'}</div>
+        <div class="detail-version">${escHtml(app.version)}${app.category ? ` · ${escHtml(app.category)}` : ""}</div>
+        <div class="detail-size">${app.size ? formatBytes(app.size) : "Calculating..."}</div>
         <div class="detail-dates">${formatDetailDates(app)}</div>
       </div>
     </div>
     <div class="section-title">Main Application</div>
     <div class="files-list">
       <div class="file-item">
-        <span class="file-category">${app.path.includes('/Users/') ? 'User App' : 'System App'}</span>
+        <span class="file-category">${app.path.includes("/Users/") ? "User App" : "System App"}</span>
         <span class="file-path">${escHtml(shortenPath(app.path))}</span>
-        <span class="file-size">${app.size ? formatBytes(app.size) : '—'}</span>
+        <span class="file-size">${app.size ? formatBytes(app.size) : "—"}</span>
         <button class="btn-refresh" style="margin-left:10px;padding:4px 10px;font-size: 14px" onclick="revealInFinder()">Show in Finder</button>
       </div>
     </div>
     <div class="section-title">
       Associated Files
-      <span style="font-weight:400;font-size: 15px;color:#86868b">${associatedFiles.length} item${associatedFiles.length !== 1 ? 's' : ''}</span>
+      <span style="font-weight:400;font-size: 15px;color:#86868b">${associatedFiles.length} item${associatedFiles.length !== 1 ? "s" : ""}</span>
     </div>
     ${filesHtml}
-    ${app.uninstaller ? `
+    ${
+      app.uninstaller
+        ? `
     <div class="uninstaller-bar">
       <div class="uninstaller-info">
         <span class="uninstaller-icon">&#9881;</span>
@@ -359,30 +374,34 @@ function renderDetail() {
         </div>
       </div>
       <button class="btn-official-uninstaller" onclick="launchUninstaller()">Run Uninstaller</button>
-    </div>` : ''}
-    ${app.brew_cask ? `<p class="modal-note">Installed with Homebrew (cask <strong>${escHtml(app.brew_cask)}</strong>). Uninstall it with Homebrew: moving it to the Trash would leave Homebrew thinking it's installed, and <code>brew upgrade</code> would bring it back.</p>` : ''}
+    </div>`
+        : ""
+    }
+    ${app.brew_cask ? `<p class="modal-note">Installed with Homebrew (cask <strong>${escHtml(app.brew_cask)}</strong>). Uninstall it with Homebrew: moving it to the Trash would leave Homebrew thinking it's installed, and <code>brew upgrade</code> would bring it back.</p>` : ""}
     ${renderRiskBanner(getAppRisk(app))}
     <div class="action-bar">
       <div class="total-size">Total to remove: <span>${formatBytes(app.size + totalSelected)}</span></div>
-      ${app.brew_cask
-        ? `<button class="btn-trash" ${canTrash ? '' : 'disabled'} onclick="confirmBrewAppUninstall()">Uninstall with Homebrew</button>`
-        : `<button class="btn-trash" ${canTrash ? '' : 'disabled'} onclick="confirmTrash()">
-        ${app.is_system ? 'System App' : app.is_self ? 'Use uninstall.sh' : 'Move to Trash'}
-      </button>`}
+      ${
+        app.brew_cask
+          ? `<button class="btn-trash" ${canTrash ? "" : "disabled"} onclick="confirmBrewAppUninstall()">Uninstall with Homebrew</button>`
+          : `<button class="btn-trash" ${canTrash ? "" : "disabled"} onclick="confirmTrash()">
+        ${app.is_system ? "System App" : app.is_self ? "Use uninstall.sh" : "Move to Trash"}
+      </button>`
+      }
     </div>
   `;
 
-  detailPanel.querySelectorAll('.file-item input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', updateTotal);
+  detailPanel.querySelectorAll('.file-item input[type="checkbox"]').forEach((cb) => {
+    cb.addEventListener("change", updateTotal);
   });
 }
 
 function calcSelectedTotal() {
   let total = 0;
   const checkboxes = detailPanel.querySelectorAll('.file-item input[type="checkbox"]');
-  checkboxes.forEach(cb => {
+  checkboxes.forEach((cb) => {
     if (cb.checked) {
-      const idx = parseInt(cb.dataset.idx);
+      const idx = parseInt(cb.dataset.idx, 10);
       if (associatedFiles[idx]) total += associatedFiles[idx].size || 0;
     }
   });
@@ -392,7 +411,7 @@ function calcSelectedTotal() {
 function updateTotal() {
   if (!selectedApp) return;
   const total = calcSelectedTotal();
-  const el = detailPanel.querySelector('.total-size span');
+  const el = detailPanel.querySelector(".total-size span");
   if (el) el.textContent = formatBytes((selectedApp.size || 0) + total);
 }
 
@@ -400,13 +419,13 @@ function confirmTrash() {
   if (!selectedApp || selectedApp.is_system || selectedApp.is_self) return;
   const warning = selectedApp._running
     ? `<strong>${escHtml(selectedApp.name)}</strong> is currently running. Sweepr will ask it to quit first, and force it to quit if it doesn't respond within a few seconds, so save any open work in it now.<br><br>`
-    : '';
+    : "";
   const selected = getSelectedFiles();
   const fileCount = selected.paths.length;
 
   openModal(`
       <h3>Move to Trash?</h3>
-      <p>${warning}This will move <strong>${escHtml(selectedApp.name)}</strong>${fileCount ? ` and ${fileCount} associated file${fileCount !== 1 ? 's' : ''}` : ''} to the Trash. You can recover them from the Trash if needed.</p>
+      <p>${warning}This will move <strong>${escHtml(selectedApp.name)}</strong>${fileCount ? ` and ${fileCount} associated file${fileCount !== 1 ? "s" : ""}` : ""} to the Trash. You can recover them from the Trash if needed.</p>
       ${trashNotes(selected.paths)}
       <div class="modal-actions">
         <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
@@ -418,16 +437,22 @@ function confirmTrash() {
 // ── Apps installed by a Homebrew cask ──
 
 function brewPackageForApp(app) {
-  return brewPackages.find(p => p.type === 'cask' && p.name === app.brew_cask)
-    || { name: app.brew_cask, type: 'cask', tap: null };
+  return (
+    brewPackages.find((p) => p.type === "cask" && p.name === app.brew_cask) || {
+      name: app.brew_cask,
+      type: "cask",
+      tap: null,
+    }
+  );
 }
 
 function confirmBrewAppUninstall() {
   const app = selectedApp;
-  if (!app || !app.brew_cask) return;
+  if (!app?.brew_cask) return;
   const pkg = brewPackageForApp(app);
   const running = app._running
-    ? `<strong>${escHtml(app.name)}</strong> is running. Sweepr will quit it first, so save any open work now.<br><br>` : '';
+    ? `<strong>${escHtml(app.name)}</strong> is running. Sweepr will quit it first, so save any open work now.<br><br>`
+    : "";
   openModal(`
       <h3>Uninstall ${escHtml(app.name)} with Homebrew?</h3>
       <p>${running}This runs <strong>brew uninstall --cask ${escHtml(app.brew_cask)}</strong>, which removes the app and makes Homebrew forget it. Then <strong>brew autoremove</strong> removes dependencies nothing needs any more.</p>
@@ -441,26 +466,32 @@ function confirmBrewAppUninstall() {
 
 async function doBrewAppUninstall() {
   const options = readBrewUninstallOptions();
-  document.querySelector('.modal-overlay')?.remove();
+  document.querySelector(".modal-overlay")?.remove();
   const app = selectedApp;
-  if (!app || !app.brew_cask) return;
+  if (!app?.brew_cask) return;
   isRemoving = true;
-  const btn = detailPanel.querySelector('.btn-trash');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Uninstalling...'; }
+  const btn = detailPanel.querySelector(".btn-trash");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Uninstalling...';
+  }
   try {
-    await runBrewUninstall(app.brew_cask, 'cask', options);
-    apps = apps.filter(a => a !== app);
+    await runBrewUninstall(app.brew_cask, "cask", options);
+    apps = apps.filter((a) => a !== app);
     indexApps();
     if (selectedApp === app) {
       selectedApp = null;
       associatedFiles = [];
-      if (currentTab === 'apps') renderUninstalled(app, true);
+      if (currentTab === "apps") renderUninstalled(app, true);
     }
-    if (currentTab === 'apps') renderAppList();
-    _brewPromise = null;  // the Homebrew tab's list is out of date now
+    if (currentTab === "apps") renderAppList();
+    _brewPromise = null; // the Homebrew tab's list is out of date now
   } catch (e) {
-    showToast(`Uninstall failed: ${e.message}`, 'error');
-    if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Uninstall with Homebrew'; }
+    showToast(`Uninstall failed: ${e.message}`, "error");
+    if (btn?.isConnected) {
+      btn.disabled = false;
+      btn.textContent = "Uninstall with Homebrew";
+    }
   }
   isRemoving = false;
 }
@@ -468,9 +499,9 @@ async function doBrewAppUninstall() {
 function getSelectedFiles() {
   const paths = [];
   const sizes = [];
-  detailPanel.querySelectorAll('.file-item input[type="checkbox"]').forEach(cb => {
+  detailPanel.querySelectorAll('.file-item input[type="checkbox"]').forEach((cb) => {
     if (cb.checked) {
-      const idx = parseInt(cb.dataset.idx);
+      const idx = parseInt(cb.dataset.idx, 10);
       paths.push(associatedFiles[idx].path);
       sizes.push(associatedFiles[idx].size);
     }
@@ -479,52 +510,58 @@ function getSelectedFiles() {
 }
 
 async function doTrash() {
-  document.querySelector('.modal-overlay')?.remove();
+  document.querySelector(".modal-overlay")?.remove();
   // Capture now: the selection can change while the request is in flight
   const app = selectedApp;
   if (!app) return;
 
   isRemoving = true;
-  const btn = detailPanel.querySelector('.btn-trash');
+  const btn = detailPanel.querySelector(".btn-trash");
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = `<span class="spinner"></span> ${app._running ? 'Quitting and removing...' : 'Removing...'}`;
+    btn.innerHTML = `<span class="spinner"></span> ${app._running ? "Quitting and removing..." : "Removing..."}`;
   }
 
   const id = appIdentifier(app);
   const selected = getSelectedFiles();
 
   try {
-    const result = await postJson(`/api/apps/${encodeURIComponent(id)}/trash`,
-      { include_app: true, file_paths: selected.paths });
+    const result = await postJson(`/api/apps/${encodeURIComponent(id)}/trash`, {
+      include_app: true,
+      file_paths: selected.paths,
+    });
 
     if (result.success && result.success.length > 0) {
       const appTrashed = result.success.includes(app.path);
       const notes = [];
-      if (result.quit && result.quit.was_running) notes.push(result.quit.forced ? 'force-quit it' : 'quit it');
-      if (result.login_items_removed && result.login_items_removed.length) notes.push('removed its login item');
-      showToast(`Moved ${result.success.length} item(s) to Trash${notes.length ? ' (' + notes.join(', ') + ')' : ''}`, 'success');
+      if (result.quit?.was_running) notes.push(result.quit.forced ? "force-quit it" : "quit it");
+      if (result.login_items_removed?.length) notes.push("removed its login item");
+      showToast(
+        `Moved ${result.success.length} item(s) to Trash${notes.length ? ` (${notes.join(", ")})` : ""}`,
+        "success",
+      );
       if (appTrashed) {
-        apps = apps.filter(a => a !== app);
+        apps = apps.filter((a) => a !== app);
         indexApps();
         if (selectedApp === app) {
           selectedApp = null;
           associatedFiles = [];
-          if (currentTab === 'apps') detailPanel.innerHTML = '<div class="detail-empty">Select an app to view details</div>';
+          if (currentTab === "apps")
+            detailPanel.innerHTML = '<div class="detail-empty">Select an app to view details</div>';
         }
-        if (currentTab === 'apps') renderAppList();
+        if (currentTab === "apps") renderAppList();
       } else if (selectedApp === app) {
-        associatedFiles = associatedFiles.filter(f => !result.success.includes(f.path));
-        if (currentTab === 'apps') renderDetail();
+        associatedFiles = associatedFiles.filter((f) => !result.success.includes(f.path));
+        if (currentTab === "apps") renderDetail();
       }
     } else if (result.failed && result.failed.length > 0) {
-      showToast(`Failed: ${result.failed[0].error}`, 'error');
+      showToast(`Failed: ${result.failed[0].error}`, "error");
     }
   } catch (e) {
-    showToast(`Failed to remove app: ${e.message}`, 'error');
+    showToast(`Failed to remove app: ${e.message}`, "error");
   }
   isRemoving = false;
-  if (selectedApp === app && currentTab === 'apps') renderDetail();
+  if (selectedApp === app && currentTab === "apps") renderDetail();
 }
 
 async function revealInFinder() {
@@ -533,7 +570,7 @@ async function revealInFinder() {
   try {
     await postJson(`/api/apps/${encodeURIComponent(id)}/reveal`);
   } catch (e) {
-    showToast(`Could not reveal in Finder: ${e.message}`, 'error');
+    showToast(`Could not reveal in Finder: ${e.message}`, "error");
   }
 }
 
@@ -543,10 +580,10 @@ async function launchUninstaller() {
   const id = appIdentifier(app);
   try {
     const result = await postJson(`/api/apps/${encodeURIComponent(id)}/launch-uninstaller`);
-    if (result.launched) showToast(`Launched ${app.uninstaller.name}`, 'success');
-    else showToast('Could not launch uninstaller', 'error');
+    if (result.launched) showToast(`Launched ${app.uninstaller.name}`, "success");
+    else showToast("Could not launch uninstaller", "error");
   } catch (e) {
-    showToast(`Could not launch uninstaller: ${e.message}`, 'error');
+    showToast(`Could not launch uninstaller: ${e.message}`, "error");
   }
 }
 
@@ -565,7 +602,7 @@ function pollSizes() {
 async function _pollSizesTick(token) {
   let data;
   try {
-    data = await fetchJson('/api/apps/sizes');
+    data = await fetchJson("/api/apps/sizes");
   } catch {
     if (token === _sizesPollGen) sizesPollTimer = setTimeout(() => _pollSizesTick(token), 3000);
     return;
@@ -579,28 +616,29 @@ async function _pollSizesTick(token) {
       changed = true;
     }
   }
-  if (changed && currentTab === 'apps') {
+  if (changed && currentTab === "apps") {
     updateSizeCells();
     if (selectedApp && !selectedApp.webloc) {
-      const sizeEl = detailPanel.querySelector('.detail-size');
-      if (sizeEl) sizeEl.textContent = selectedApp.size ? formatBytes(selectedApp.size) : 'Calculating...';
+      const sizeEl = detailPanel.querySelector(".detail-size");
+      if (sizeEl)
+        sizeEl.textContent = selectedApp.size ? formatBytes(selectedApp.size) : "Calculating...";
       updateTotal();
     }
   }
   if (!data.complete) {
     sizesPollTimer = setTimeout(() => _pollSizesTick(token), 1500);
   } else {
-    setLoading('sizes', false);
+    setLoading("sizes", false);
   }
 }
 
 function updateSizeCells() {
-  const byId = new Map(apps.map(a => [appIdentifier(a), a]));
-  appListEl.querySelectorAll('.app-item').forEach(el => {
+  const byId = new Map(apps.map((a) => [appIdentifier(a), a]));
+  appListEl.querySelectorAll(".app-item").forEach((el) => {
     const app = byId.get(el.dataset.id);
     if (app) {
-      const sizeEl = el.querySelector('.app-size');
-      if (sizeEl) sizeEl.textContent = app.size ? formatBytes(app.size) : '—';
+      const sizeEl = el.querySelector(".app-size");
+      if (sizeEl) sizeEl.textContent = app.size ? formatBytes(app.size) : "—";
     }
   });
 }
