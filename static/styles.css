@@ -22,9 +22,9 @@
   --success: #34c759;
   --warning: #ff9500;
   --spinner-track: #d2d2d7;
-  --modal-backdrop: rgba(0,0,0,0.4);
-  --shadow-modal: 0 20px 60px rgba(0,0,0,0.3);
-  --shadow-toast: 0 4px 20px rgba(0,0,0,0.2);
+  --modal-backdrop: rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --shadow-toast: 0 4px 20px rgba(0, 0, 0, 0.2);
   --disabled-bg: #d2d2d7;
 }
 
@@ -50,15 +50,20 @@
   --success: #30d158;
   --warning: #ff9f0a;
   --spinner-track: #48484a;
-  --modal-backdrop: rgba(0,0,0,0.6);
-  --shadow-modal: 0 20px 60px rgba(0,0,0,0.6);
-  --shadow-toast: 0 4px 20px rgba(0,0,0,0.4);
+  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --shadow-toast: 0 4px 20px rgba(0, 0, 0, 0.4);
   --disabled-bg: #48484a;
 }
 
 /* ── Base ── */
 
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: inherit; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: inherit;
+}
 body {
   font-family: "Josefin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 18px;
@@ -68,7 +73,9 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 /* ── Header ── */
@@ -100,7 +107,10 @@ body {
   background: var(--bg-input);
   color: var(--text-primary);
 }
-.search-box:focus { border-color: var(--accent); background: var(--bg-input-focus); }
+.search-box:focus {
+  border-color: var(--accent);
+  background: var(--bg-input-focus);
+}
 .toggle-label {
   font-size: 15px;
   color: var(--text-muted);
@@ -117,7 +127,9 @@ body {
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   font-size: 16px;
-  background: var(--bg-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2386868b'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background: var(--bg-surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2386868b'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
   color: var(--text-primary);
   outline: none;
   cursor: pointer;
@@ -132,7 +144,9 @@ body {
   color: var(--text-primary);
   line-height: 1;
 }
-.theme-toggle:hover { background: var(--bg-btn-secondary-hover); }
+.theme-toggle:hover {
+  background: var(--bg-btn-secondary-hover);
+}
 
 /* ── Tabs ── */
 
@@ -163,9 +177,13 @@ body {
   border-top: none;
   border-left: none;
   border-right: none;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.tab:hover { color: var(--text-primary); }
+.tab:hover {
+  color: var(--text-primary);
+}
 .tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
@@ -197,9 +215,15 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   transition: background 0.15s;
 }
-.app-item:hover { background: var(--bg-hover); }
-.app-item.selected { background: var(--bg-selected); }
-.app-item.system { opacity: 0.5; }
+.app-item:hover {
+  background: var(--bg-hover);
+}
+.app-item.selected {
+  background: var(--bg-selected);
+}
+.app-item.system {
+  opacity: 0.5;
+}
 .app-icon {
   width: 40px;
   height: 40px;
@@ -220,7 +244,10 @@ body {
   font-size: 22px;
   color: var(--text-secondary);
 }
-.app-info { flex: 1; min-width: 0; }
+.app-info {
+  flex: 1;
+  min-width: 0;
+}
 .app-name {
   font-size: 16px;
   font-weight: 500;
@@ -281,9 +308,19 @@ body {
   height: 64px;
   border-radius: 14px;
 }
-.detail-icon .fallback { font-size: 34px; color: var(--text-secondary); }
-.detail-title { font-size: 24px; font-weight: 600; }
-.detail-version { font-size: 16px; color: var(--text-secondary); margin-top: 2px; }
+.detail-icon .fallback {
+  font-size: 34px;
+  color: var(--text-secondary);
+}
+.detail-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+.detail-version {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
 .detail-path {
   font-size: 14px;
   color: var(--text-secondary);
@@ -331,8 +368,13 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   font-size: 15px;
 }
-.file-item:last-child { border-bottom: none; }
-.file-item input[type="checkbox"] { margin-right: 10px; flex-shrink: 0; }
+.file-item:last-child {
+  border-bottom: none;
+}
+.file-item input[type="checkbox"] {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
 .file-path {
   flex: 1;
   word-break: break-all;
@@ -372,8 +414,13 @@ body {
   border-radius: 10px;
   border: 1px solid var(--border-primary);
 }
-.total-size { font-size: 16px; color: var(--text-primary); }
-.total-size span { font-weight: 600; }
+.total-size {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.total-size span {
+  font-weight: 600;
+}
 
 /* ── Buttons ── */
 
@@ -388,8 +435,13 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-trash:hover { background: var(--danger-hover); }
-.btn-trash:disabled { background: var(--disabled-bg); cursor: not-allowed; }
+.btn-trash:hover {
+  background: var(--danger-hover);
+}
+.btn-trash:disabled {
+  background: var(--disabled-bg);
+  cursor: not-allowed;
+}
 .btn-refresh {
   padding: 6px 14px;
   background: var(--bg-btn-secondary);
@@ -399,7 +451,9 @@ body {
   cursor: pointer;
   color: var(--text-primary);
 }
-.btn-refresh:hover { background: var(--bg-btn-secondary-hover); }
+.btn-refresh:hover {
+  background: var(--bg-btn-secondary-hover);
+}
 .btn-uninstall {
   padding: 10px 24px;
   background: var(--danger);
@@ -411,8 +465,13 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-uninstall:hover { background: var(--danger-hover); }
-.btn-uninstall:disabled { background: var(--disabled-bg); cursor: not-allowed; }
+.btn-uninstall:hover {
+  background: var(--danger-hover);
+}
+.btn-uninstall:disabled {
+  background: var(--disabled-bg);
+  cursor: not-allowed;
+}
 .btn-cleanup {
   padding: 10px 24px;
   background: var(--danger);
@@ -424,8 +483,13 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-cleanup:hover { background: var(--danger-hover); }
-.btn-cleanup:disabled { background: var(--disabled-bg); cursor: not-allowed; }
+.btn-cleanup:hover {
+  background: var(--danger-hover);
+}
+.btn-cleanup:disabled {
+  background: var(--disabled-bg);
+  cursor: not-allowed;
+}
 .btn-cancel {
   padding: 8px 20px;
   background: var(--bg-cancel);
@@ -457,7 +521,9 @@ body {
   flex-shrink: 0;
   transition: opacity 0.15s;
 }
-.btn-official-uninstaller:hover { opacity: 0.85; }
+.btn-official-uninstaller:hover {
+  opacity: 0.85;
+}
 
 /* ── Badges ── */
 
@@ -488,8 +554,12 @@ body {
   margin-left: 8px;
   font-weight: 500;
 }
-.brew-type-badge.formula { background: var(--accent); }
-.brew-type-badge.cask { background: #af52de; }
+.brew-type-badge.formula {
+  background: var(--accent);
+}
+.brew-type-badge.cask {
+  background: #af52de;
+}
 .dep-badge {
   font-size: 12px;
   color: var(--text-secondary);
@@ -532,7 +602,9 @@ body {
   align-items: center;
   gap: 12px;
 }
-.uninstaller-icon { font-size: 24px; }
+.uninstaller-icon {
+  font-size: 24px;
+}
 .uninstaller-label {
   font-size: 15px;
   font-weight: 600;
@@ -552,8 +624,12 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   transition: background 0.15s;
 }
-.orphan-group:hover { background: var(--bg-hover); }
-.orphan-group.selected { background: var(--bg-selected); }
+.orphan-group:hover {
+  background: var(--bg-hover);
+}
+.orphan-group.selected {
+  background: var(--bg-selected);
+}
 .orphan-group-header {
   display: flex;
   align-items: center;
@@ -578,8 +654,12 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.orphan-summary-text { font-size: 16px; }
-.orphan-summary-text span { font-weight: 600; }
+.orphan-summary-text {
+  font-size: 16px;
+}
+.orphan-summary-text span {
+  font-weight: 600;
+}
 
 /* ── Modal ── */
 
@@ -600,9 +680,22 @@ body {
   width: 90%;
   box-shadow: var(--shadow-modal);
 }
-.modal h3 { font-size: 19px; font-weight: 600; margin-bottom: 8px; }
-.modal p { font-size: 16px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.modal h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.modal p {
+  font-size: 16px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 /* ── Toast ── */
 
@@ -616,11 +709,21 @@ body {
   color: #fff;
   z-index: 1001;
   box-shadow: var(--shadow-toast);
-  transition: opacity 0.3s, transform 0.3s;
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
 }
-.toast.success { background: var(--success); }
-.toast.error { background: var(--danger); }
-.toast.hidden { opacity: 0; transform: translateY(10px); pointer-events: none; }
+.toast.success {
+  background: var(--success);
+}
+.toast.error {
+  background: var(--danger);
+}
+.toast.hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
 
 /* ── Spinner ── */
 
@@ -635,7 +738,11 @@ body {
   margin-right: 8px;
   vertical-align: middle;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* ── Risk Indicators ── */
 
@@ -868,10 +975,21 @@ body {
   font-size: 13px;
 }
 
-.restart-banner details { margin-top: 4px; }
-.restart-banner summary { cursor: pointer; color: var(--accent); width: fit-content; }
-.restart-banner ul { margin: 6px 0 0 18px; padding: 0; }
-.restart-banner li { margin: 2px 0; }
+.restart-banner details {
+  margin-top: 4px;
+}
+.restart-banner summary {
+  cursor: pointer;
+  color: var(--accent);
+  width: fit-content;
+}
+.restart-banner ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+.restart-banner li {
+  margin: 2px 0;
+}
 
 /* Checkbox options inside confirmation dialogs */
 .modal-option {
@@ -883,4 +1001,6 @@ body {
   line-height: 1.4;
   text-align: left;
 }
-.modal-option input { margin-top: 2px; }
+.modal-option input {
+  margin-top: 2px;
+}

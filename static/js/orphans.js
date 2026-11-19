@@ -2,11 +2,23 @@
 
 // Canonical order for category display
 const ORPHAN_CATEGORY_ORDER = [
-  'Caches', 'Application Support', 'Containers', 'Preferences',
-  'Preferences (ByHost)', 'Saved Application State', 'Group Containers',
-  'HTTP Storages', 'Accounts', 'System Launch Agents',
-  'System Launch Daemons', 'Privileged Helpers',
-  'Logs', 'Launch Agents', 'Spotlight', 'Home Folder', 'Command-line Tools',
+  "Caches",
+  "Application Support",
+  "Containers",
+  "Preferences",
+  "Preferences (ByHost)",
+  "Saved Application State",
+  "Group Containers",
+  "HTTP Storages",
+  "Accounts",
+  "System Launch Agents",
+  "System Launch Daemons",
+  "Privileged Helpers",
+  "Logs",
+  "Launch Agents",
+  "Spotlight",
+  "Home Folder",
+  "Command-line Tools",
 ];
 
 let orphanCategories = []; // derived from orphanGroups, grouped by category
@@ -17,7 +29,7 @@ function _buildOrphanCategories() {
   for (const group of orphanGroups) {
     for (const app of group.apps) {
       for (const file of app.files) {
-        const cat = file.category || 'Other';
+        const cat = file.category || "Other";
         if (!byCategory[cat]) byCategory[cat] = { category: cat, files: [], total_size: 0 };
         byCategory[cat].files.push({ ...file, app_name: app.app_name, vendor: group.vendor });
         byCategory[cat].total_size += file.size;
@@ -39,62 +51,75 @@ function _buildOrphanCategories() {
 
 async function fetchOrphans() {
   const gen = ++fetchGeneration;
-  appListEl.innerHTML = '<div class="loading-files"><span class="spinner"></span> Scanning for orphaned files...</div>';
+  appListEl.innerHTML =
+    '<div class="loading-files"><span class="spinner"></span> Scanning for orphaned files...</div>';
   try {
-    const data = await fetchJson('/api/orphans');
+    const data = await fetchJson("/api/orphans");
     orphanGroups = data.groups || [];
   } catch (e) {
-    if (gen === fetchGeneration && currentTab === 'orphans') {
+    if (gen === fetchGeneration && currentTab === "orphans") {
       appListEl.innerHTML = `<div class="loading-files">Orphan scan failed: ${escHtml(e.message)}</div>`;
     }
     return;
   }
   _buildOrphanCategories();
-  if (gen === fetchGeneration && currentTab === 'orphans') renderOrphanList();
+  if (gen === fetchGeneration && currentTab === "orphans") renderOrphanList();
 }
 
 function getFilteredOrphans() {
   if (!orphanCategories || !orphanCategories.length) return [];
   const q = searchBox.value.toLowerCase().trim();
   if (!q) return orphanCategories;
-  return orphanCategories.map(cat => ({
-    ...cat,
-    files: cat.files.filter(f =>
-      f.app_name.toLowerCase().includes(q) ||
-      (f.bundle_id || '').toLowerCase().includes(q) ||
-      (f.vendor || '').toLowerCase().includes(q) ||
-      f.path.toLowerCase().includes(q)
-    ),
-  })).filter(cat => cat.files.length > 0).map(cat => ({
-    ...cat,
-    total_size: cat.files.reduce((s, f) => s + f.size, 0),
-  }));
+  return orphanCategories
+    .map((cat) => ({
+      ...cat,
+      files: cat.files.filter(
+        (f) =>
+          f.app_name.toLowerCase().includes(q) ||
+          (f.bundle_id || "").toLowerCase().includes(q) ||
+          (f.vendor || "").toLowerCase().includes(q) ||
+          f.path.toLowerCase().includes(q),
+      ),
+    }))
+    .filter((cat) => cat.files.length > 0)
+    .map((cat) => ({
+      ...cat,
+      total_size: cat.files.reduce((s, f) => s + f.size, 0),
+    }));
 }
 
 function renderOrphanList() {
   const filtered = getFilteredOrphans();
-  let html = '';
+  let html = "";
   const totalSize = filtered.reduce((s, c) => s + c.total_size, 0);
   const totalFiles = filtered.reduce((s, c) => s + c.files.length, 0);
   for (const cat of filtered) {
-    const sel = selectedOrphan && selectedOrphan.category === cat.category ? ' selected' : '';
+    const sel = selectedOrphan && selectedOrphan.category === cat.category ? " selected" : "";
     html += `<div class="orphan-group${sel}" data-id="${escHtml(cat.category)}" onclick="selectOrphan(this.dataset.id)">
       <div class="orphan-group-header">
         <div>
           <div class="orphan-group-name">${escHtml(cat.category)}</div>
-          <div class="orphan-group-meta">${cat.files.length} file${cat.files.length !== 1 ? 's' : ''}</div>
+          <div class="orphan-group-meta">${cat.files.length} file${cat.files.length !== 1 ? "s" : ""}</div>
         </div>
         <div class="app-size">${formatBytes(cat.total_size)}</div>
       </div>
     </div>`;
   }
-  document.getElementById('tabCount').textContent = filtered.length + ' categor' + (filtered.length !== 1 ? 'ies' : 'y') + ' · ' + totalFiles + ' files · ' + formatBytes(totalSize) + ' reclaimable';
+  document.getElementById("tabCount").textContent =
+    filtered.length +
+    " categor" +
+    (filtered.length !== 1 ? "ies" : "y") +
+    " · " +
+    totalFiles +
+    " files · " +
+    formatBytes(totalSize) +
+    " reclaimable";
   appListEl.innerHTML = html;
 }
 
 function selectOrphan(category) {
   const filtered = getFilteredOrphans();
-  selectedOrphan = filtered.find(c => c.category === category);
+  selectedOrphan = filtered.find((c) => c.category === category);
   if (!selectedOrphan) return;
   renderOrphanList();
   renderOrphanDetail();
@@ -114,7 +139,7 @@ function renderOrphanDetail() {
   }
   const apps = Object.values(byApp).sort((a, b) => b.total_size - a.total_size);
 
-  let appsHtml = '';
+  let appsHtml = "";
   let fileIdx = 0;
   for (const app of apps) {
     const sortedFiles = [...app.files].sort((a, b) => b.size - a.size);
@@ -126,17 +151,17 @@ function renderOrphanDetail() {
     for (const f of sortedFiles) {
       // Protected containers are listed for information but can't be removed
       appsHtml += `<div class="file-item">
-        <input type="checkbox" ${f.protected ? 'disabled' : 'checked'} data-idx="${fileIdx}" class="orphan-cb">
-        <span class="file-category">${escHtml(f.vendor || '')}</span>
-        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ''}</span>
+        <input type="checkbox" ${f.protected ? "disabled" : "checked"} data-idx="${fileIdx}" class="orphan-cb">
+        <span class="file-category">${escHtml(f.vendor || "")}</span>
+        <span class="file-path">${escHtml(shortenPath(f.path))}${trashHint(f.path)}${f.protected ? ` <span class="dep-badge" title="macOS doesn&#39;t let other programs, Finder included, remove another app&#39;s container. It&#39;s harmless to leave; to remove it, give your terminal app Full Disk Access, delete it from there, then turn that access off.">protected by macOS</span>` : ""}</span>
         <span class="file-size">${formatBytes(f.size)}</span>
       </div>`;
       fileIdx++;
     }
-    appsHtml += '</div>';
+    appsHtml += "</div>";
   }
 
-  const removable = cat.files.filter(f => !f.protected);
+  const removable = cat.files.filter((f) => !f.protected);
   const removableSize = removable.reduce((s, f) => s + f.size, 0);
 
   detailPanel.innerHTML = `
@@ -144,28 +169,28 @@ function renderOrphanDetail() {
       <div class="brew-icon" style="width:64px;height:64px;border-radius:14px;font-size:30px;margin-right:16px">&#128193;</div>
       <div>
         <div class="detail-title">${escHtml(cat.category)}</div>
-        <div class="detail-version">${cat.files.length} orphaned file${cat.files.length !== 1 ? 's' : ''} — no longer associated with any installed app</div>
+        <div class="detail-version">${cat.files.length} orphaned file${cat.files.length !== 1 ? "s" : ""} — no longer associated with any installed app</div>
         <div class="detail-size">Total size: ${formatBytes(cat.total_size)}</div>
       </div>
     </div>
     ${appsHtml}
-    ${cat.category === 'Home Folder' ? '<p class="modal-note">Hidden folders get a visible name in the Trash (for example \u201collama (was .ollama)\u201d), since Finder hides names starting with a dot. Empty the Trash to free the space.</p>' : ''}
-    ${cat.category === 'Command-line Tools' ? '<p class="modal-note">These links are in a system folder, so macOS will ask for your administrator password to move them to the Trash.</p>' : ''}
-    ${renderRiskBanner({ level: 'low', reason: 'Named for apps that are no longer installed. Matching is by name, so review the list; everything goes to the Trash and can be restored' })}
+    ${cat.category === "Home Folder" ? '<p class="modal-note">Hidden folders get a visible name in the Trash (for example \u201collama (was .ollama)\u201d), since Finder hides names starting with a dot. Empty the Trash to free the space.</p>' : ""}
+    ${cat.category === "Command-line Tools" ? '<p class="modal-note">These links are in a system folder, so macOS will ask for your administrator password to move them to the Trash.</p>' : ""}
+    ${renderRiskBanner({ level: "low", reason: "Named for apps that are no longer installed. Matching is by name, so review the list; everything goes to the Trash and can be restored" })}
     <div class="action-bar">
       <div class="total-size">Selected: <span>${formatBytes(removableSize)}</span></div>
-      <button class="btn-cleanup" ${removable.length ? 'onclick="confirmOrphanCleanup()"' : 'disabled'}>Clean Up</button>
+      <button class="btn-cleanup" ${removable.length ? 'onclick="confirmOrphanCleanup()"' : "disabled"}>Clean Up</button>
     </div>
   `;
 
   const allFiles = _getCategoryFiles();
-  detailPanel.querySelectorAll('.orphan-cb').forEach(cb => {
-    cb.addEventListener('change', () => {
+  detailPanel.querySelectorAll(".orphan-cb").forEach((cb) => {
+    cb.addEventListener("change", () => {
       let total = 0;
-      detailPanel.querySelectorAll('.orphan-cb').forEach(c => {
+      detailPanel.querySelectorAll(".orphan-cb").forEach((c) => {
         if (c.checked) total += allFiles[parseInt(c.dataset.idx)].size;
       });
-      const el = detailPanel.querySelector('.total-size span');
+      const el = detailPanel.querySelector(".total-size span");
       if (el) el.textContent = formatBytes(total);
     });
   });
@@ -183,16 +208,19 @@ function _getCategoryFiles() {
   }
   return Object.values(byApp)
     .sort((a, b) => b.total_size - a.total_size)
-    .flatMap(a => [...a.files].sort((x, y) => y.size - x.size));
+    .flatMap((a) => [...a.files].sort((x, y) => y.size - x.size));
 }
 
 function confirmOrphanCleanup() {
   if (!selectedOrphan) return;
   const paths = getSelectedOrphanPaths();
-  if (!paths.length) { showToast('Nothing selected', 'error'); return; }
+  if (!paths.length) {
+    showToast("Nothing selected", "error");
+    return;
+  }
   openModal(`
       <h3>Clean up orphaned files?</h3>
-      <p>This will move ${paths.length} orphaned file${paths.length !== 1 ? 's' : ''} from <strong>${escHtml(selectedOrphan.category)}</strong> to the Trash.</p>
+      <p>This will move ${paths.length} orphaned file${paths.length !== 1 ? "s" : ""} from <strong>${escHtml(selectedOrphan.category)}</strong> to the Trash.</p>
       ${trashNotes(paths)}
       <div class="modal-actions">
         <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
@@ -204,7 +232,7 @@ function confirmOrphanCleanup() {
 function getSelectedOrphanPaths() {
   const allFiles = _getCategoryFiles();
   const paths = [];
-  detailPanel.querySelectorAll('.orphan-cb').forEach(cb => {
+  detailPanel.querySelectorAll(".orphan-cb").forEach((cb) => {
     if (cb.checked) {
       const idx = parseInt(cb.dataset.idx);
       paths.push(allFiles[idx].path);
@@ -214,27 +242,41 @@ function getSelectedOrphanPaths() {
 }
 
 async function doOrphanCleanup() {
-  document.querySelector('.modal-overlay')?.remove();
+  document.querySelector(".modal-overlay")?.remove();
   if (!selectedOrphan) return;
 
-  const btn = detailPanel.querySelector('.btn-cleanup');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Cleaning...'; }
+  const btn = detailPanel.querySelector(".btn-cleanup");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Cleaning...';
+  }
 
   const paths = getSelectedOrphanPaths();
   try {
-    const result = await postJson('/api/orphans/trash', { paths });
+    const result = await postJson("/api/orphans/trash", { paths });
     if (result.success && result.success.length > 0) {
-      const failedNote = result.failed && result.failed.length ? `, ${result.failed.length} failed` : '';
-      showToast(`Moved ${result.success.length} item(s) to the Trash${failedNote}`, result.failed && result.failed.length ? 'error' : 'success');
+      const failedNote =
+        result.failed && result.failed.length ? `, ${result.failed.length} failed` : "";
+      showToast(
+        `Moved ${result.success.length} item(s) to the Trash${failedNote}`,
+        result.failed && result.failed.length ? "error" : "success",
+      );
       selectedOrphan = null;
-      if (currentTab === 'orphans') detailPanel.innerHTML = '<div class="detail-empty">Select a category to view files</div>';
+      if (currentTab === "orphans")
+        detailPanel.innerHTML = '<div class="detail-empty">Select a category to view files</div>';
       await fetchOrphans();
     } else if (result.failed && result.failed.length > 0) {
-      showToast(`Failed: ${result.failed[0].error}`, 'error');
-      if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Clean Up'; }
+      showToast(`Failed: ${result.failed[0].error}`, "error");
+      if (btn && btn.isConnected) {
+        btn.disabled = false;
+        btn.textContent = "Clean Up";
+      }
     }
   } catch (e) {
-    showToast(`Cleanup failed: ${e.message}`, 'error');
-    if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Clean Up'; }
+    showToast(`Cleanup failed: ${e.message}`, "error");
+    if (btn && btn.isConnected) {
+      btn.disabled = false;
+      btn.textContent = "Clean Up";
+    }
   }
 }
