@@ -216,7 +216,7 @@ function renderStorageRoots() {
     let sizeCell;
     if (r.size != null) {
       sizeCell = r.scanning
-        ? formatBytes(r.size) + ' <span class="spinner storage-inline-spinner"></span>'
+        ? `${formatBytes(r.size)} <span class="spinner storage-inline-spinner"></span>`
         : formatBytes(r.size);
     } else {
       sizeCell = '<span class="spinner"></span>';
@@ -299,9 +299,9 @@ function renderStorageDir() {
 
 function selectStorageEntry(path) {
   selectedStorage = path;
-  storageItemsEl
-    .querySelectorAll(".app-item.storage.selected")
-    .forEach((r) => r.classList.remove("selected"));
+  storageItemsEl.querySelectorAll(".app-item.storage.selected").forEach((r) => {
+    r.classList.remove("selected");
+  });
   for (const r of storageItemsEl.querySelectorAll(".app-item.storage")) {
     if (r.dataset.path === selectedStorage) {
       r.classList.add("selected");

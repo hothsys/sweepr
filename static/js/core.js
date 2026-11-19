@@ -44,9 +44,9 @@ const refreshBtn = document.getElementById("refreshBtn");
 function switchTab(tab) {
   currentTab = tab;
   fetchGeneration++;
-  document
-    .querySelectorAll(".tab")
-    .forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
   const emptyMsgs = {
     apps: "Select an app to view details",
     brew: "Select a package to view details",

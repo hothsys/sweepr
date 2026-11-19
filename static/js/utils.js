@@ -17,7 +17,7 @@ async function fetchJson(url, options) {
   try {
     data = await resp.json();
   } catch {}
-  if (!resp.ok) throw new Error((data && data.error) || `Request failed (${resp.status})`);
+  if (!resp.ok) throw new Error(data?.error || `Request failed (${resp.status})`);
   return data;
 }
 
@@ -46,22 +46,22 @@ function formatBytes(bytes) {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const val = bytes / Math.pow(1024, i);
-  return val.toFixed(i === 0 ? 0 : 1) + " " + units[i];
+  const val = bytes / 1024 ** i;
+  return `${val.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
   try {
     const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
+    if (Number.isNaN(d.getTime())) return dateStr;
     const now = new Date();
     const diff = now - d;
     const days = Math.floor(diff / 86400000);
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
-    if (days < 30) return days + "d ago";
-    if (days < 365) return Math.floor(days / 30) + "mo ago";
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch {
     return dateStr;
@@ -72,7 +72,7 @@ function formatFullDate(dateStr) {
   if (!dateStr) return "";
   try {
     const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
+    if (Number.isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   } catch {
     return dateStr;
@@ -81,15 +81,15 @@ function formatFullDate(dateStr) {
 
 function formatDetailDates(app) {
   const parts = [];
-  if (app.last_updated) parts.push("App version date: " + formatFullDate(app.last_updated));
-  if (app.last_used) parts.push("Last used: " + formatFullDate(app.last_used));
+  if (app.last_updated) parts.push(`App version date: ${formatFullDate(app.last_updated)}`);
+  if (app.last_used) parts.push(`Last used: ${formatFullDate(app.last_used)}`);
   return parts.join("<br>");
 }
 
 function shortenPath(p) {
   const home = "/Users/";
   const idx = p.indexOf("/", home.length);
-  if (idx > 0) return "~" + p.substring(idx);
+  if (idx > 0) return `~${p.substring(idx)}`;
   return p;
 }
 

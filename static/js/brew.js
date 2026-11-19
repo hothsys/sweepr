@@ -97,7 +97,7 @@ function renderBrewList() {
   for (const pkg of filtered) {
     const sel = selectedBrew && brewKey(selectedBrew) === brewKey(pkg) ? " selected" : "";
     const typeIcon = pkg.type === "cask" ? "&#9671;" : "&#9670;";
-    const meta = pkg.version + (pkg.installed_at ? " · " + formatDate(pkg.installed_at) : "");
+    const meta = pkg.version + (pkg.installed_at ? ` · ${formatDate(pkg.installed_at)}` : "");
     html += `<div class="app-item${sel}" data-id="${escHtml(brewKey(pkg))}" onclick="selectBrew(this.dataset.id)">
       <div class="brew-icon">${typeIcon}</div>
       <div class="app-info">
@@ -152,7 +152,7 @@ async function copyBrewFix() {
 
 // A formula and a cask can share a name, so identify packages by both
 function brewKey(pkg) {
-  return pkg.type + ":" + pkg.name;
+  return `${pkg.type}:${pkg.name}`;
 }
 
 function selectBrew(key) {
@@ -175,14 +175,14 @@ function renderBrewDetail() {
         <div class="detail-version">${escHtml(pkg.version)}${pkg.outdated ? ' · <span style="color:var(--warning)">outdated</span>' : ""}</div>
         ${pkg.description ? `<div class="detail-desc">${escHtml(pkg.description)}</div>` : ""}
         <div class="detail-dates">
-          ${pkg.installed_at ? "Installed: " + formatFullDate(pkg.installed_at) : ""}
-          ${pkg.size ? "<br>Size: " + formatBytes(pkg.size) : ""}
-          ${pkg.dependencies ? "<br>Dependencies: " + pkg.dependencies : ""}
+          ${pkg.installed_at ? `Installed: ${formatFullDate(pkg.installed_at)}` : ""}
+          ${pkg.size ? `<br>Size: ${formatBytes(pkg.size)}` : ""}
+          ${pkg.dependencies ? `<br>Dependencies: ${pkg.dependencies}` : ""}
           ${pkg.pinned ? "<br>Pinned (will not be auto-removed)" : ""}
-          ${pkg.tap ? "<br>From tap: " + escHtml(pkg.tap) : ""}
+          ${pkg.tap ? `<br>From tap: ${escHtml(pkg.tap)}` : ""}
           ${pkg.installed_on_request === false ? "<br>Installed as a dependency" : ""}
           ${pkg.service ? "<br>Registered as a background service" : ""}
-          ${pkg.used_by && pkg.used_by.length ? "<br>Required by: " + escHtml(pkg.used_by.join(", ")) : ""}
+          ${pkg.used_by?.length ? `<br>Required by: ${escHtml(pkg.used_by.join(", "))}` : ""}
         </div>
       </div>
     </div>
@@ -256,12 +256,12 @@ async function runBrewUninstall(name, type, options) {
     ...options,
   });
   const notes = [];
-  if (result.autoremoved && result.autoremoved.length)
+  if (result.autoremoved?.length)
     notes.push(`autoremove also removed ${result.autoremoved.join(", ")}`);
   if (result.untapped) notes.push(`removed the ${result.tap} tap`);
   else if (options.untap && result.untap_note) notes.push(`kept the tap: ${result.untap_note}`);
-  showToast(`Uninstalled ${name}${notes.length ? "; " + notes.join("; ") : ""}`, "success");
-  if (result.leftovers && result.leftovers.length) showBrewLeftovers(name, result.leftovers);
+  showToast(`Uninstalled ${name}${notes.length ? `; ${notes.join("; ")}` : ""}`, "success");
+  if (result.leftovers?.length) showBrewLeftovers(name, result.leftovers);
   return result;
 }
 
@@ -294,13 +294,12 @@ async function trashBrewLeftovers() {
   const overlay = document.querySelector(".modal-overlay");
   const paths = [...overlay.querySelectorAll(".leftover-cb")]
     .filter((cb) => cb.checked)
-    .map((cb) => _brewLeftovers[parseInt(cb.dataset.idx)].path);
+    .map((cb) => _brewLeftovers[parseInt(cb.dataset.idx, 10)].path);
   overlay.remove();
   if (!paths.length) return;
   try {
     const result = await postJson("/api/brew/leftovers/trash", { paths });
-    if (result.failed && result.failed.length)
-      showToast(`Failed: ${result.failed[0].error}`, "error");
+    if (result.failed?.length) showToast(`Failed: ${result.failed[0].error}`, "error");
     else showToast(`Moved ${result.success.length} item(s) to the Trash`, "success");
   } catch (e) {
     showToast(`Couldn't move leftovers: ${e.message}`, "error");
@@ -329,7 +328,7 @@ async function doBrewUninstall() {
     await fetchBrew(true);
   } catch (e) {
     showToast(`Uninstall failed: ${e.message}`, "error");
-    if (btn && btn.isConnected) {
+    if (btn?.isConnected) {
       btn.disabled = false;
       btn.textContent = "Uninstall";
     }

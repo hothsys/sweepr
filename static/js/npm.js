@@ -42,7 +42,7 @@ function renderNpmList() {
   let html = "";
   for (const pkg of filtered) {
     const sel = selectedNpm && selectedNpm.name === pkg.name ? " selected" : "";
-    const meta = pkg.version + (pkg.installed_at ? " · " + formatDate(pkg.installed_at) : "");
+    const meta = pkg.version + (pkg.installed_at ? ` · ${formatDate(pkg.installed_at)}` : "");
     html += `<div class="app-item${sel}" data-id="${escHtml(pkg.name)}" onclick="selectNpm(this.dataset.id)">
       <div class="brew-icon">&#9729;</div>
       <div class="app-info">
@@ -54,7 +54,7 @@ function renderNpmList() {
   }
   appListEl.innerHTML = html;
   document.getElementById("tabCount").textContent =
-    filtered.length + " package" + (filtered.length !== 1 ? "s" : "");
+    `${filtered.length} package${filtered.length !== 1 ? "s" : ""}`;
 }
 
 function selectNpm(name) {
@@ -76,8 +76,8 @@ function renderNpmDetail() {
         <div class="detail-version">${escHtml(pkg.version)}</div>
         ${pkg.description ? `<div class="detail-desc">${escHtml(pkg.description)}</div>` : ""}
         <div class="detail-dates">
-          ${pkg.installed_at ? "Installed: " + formatFullDate(pkg.installed_at) : ""}
-          ${pkg.size ? "<br>Size: " + formatBytes(pkg.size) : ""}
+          ${pkg.installed_at ? `Installed: ${formatFullDate(pkg.installed_at)}` : ""}
+          ${pkg.size ? `<br>Size: ${formatBytes(pkg.size)}` : ""}
         </div>
       </div>
     </div>
@@ -123,7 +123,7 @@ async function doNpmUninstall() {
     await fetchNpm(true);
   } catch (e) {
     showToast(`Uninstall failed: ${e.message}`, "error");
-    if (btn && btn.isConnected) {
+    if (btn?.isConnected) {
       btn.disabled = false;
       btn.textContent = "Uninstall";
     }

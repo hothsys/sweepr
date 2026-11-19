@@ -67,7 +67,7 @@ async function fetchOrphans() {
 }
 
 function getFilteredOrphans() {
-  if (!orphanCategories || !orphanCategories.length) return [];
+  if (!orphanCategories?.length) return [];
   const q = searchBox.value.toLowerCase().trim();
   if (!q) return orphanCategories;
   return orphanCategories
@@ -188,7 +188,7 @@ function renderOrphanDetail() {
     cb.addEventListener("change", () => {
       let total = 0;
       detailPanel.querySelectorAll(".orphan-cb").forEach((c) => {
-        if (c.checked) total += allFiles[parseInt(c.dataset.idx)].size;
+        if (c.checked) total += allFiles[parseInt(c.dataset.idx, 10)].size;
       });
       const el = detailPanel.querySelector(".total-size span");
       if (el) el.textContent = formatBytes(total);
@@ -234,7 +234,7 @@ function getSelectedOrphanPaths() {
   const paths = [];
   detailPanel.querySelectorAll(".orphan-cb").forEach((cb) => {
     if (cb.checked) {
-      const idx = parseInt(cb.dataset.idx);
+      const idx = parseInt(cb.dataset.idx, 10);
       paths.push(allFiles[idx].path);
     }
   });
@@ -255,11 +255,10 @@ async function doOrphanCleanup() {
   try {
     const result = await postJson("/api/orphans/trash", { paths });
     if (result.success && result.success.length > 0) {
-      const failedNote =
-        result.failed && result.failed.length ? `, ${result.failed.length} failed` : "";
+      const failedNote = result.failed?.length ? `, ${result.failed.length} failed` : "";
       showToast(
         `Moved ${result.success.length} item(s) to the Trash${failedNote}`,
-        result.failed && result.failed.length ? "error" : "success",
+        result.failed?.length ? "error" : "success",
       );
       selectedOrphan = null;
       if (currentTab === "orphans")
@@ -267,14 +266,14 @@ async function doOrphanCleanup() {
       await fetchOrphans();
     } else if (result.failed && result.failed.length > 0) {
       showToast(`Failed: ${result.failed[0].error}`, "error");
-      if (btn && btn.isConnected) {
+      if (btn?.isConnected) {
         btn.disabled = false;
         btn.textContent = "Clean Up";
       }
     }
   } catch (e) {
     showToast(`Cleanup failed: ${e.message}`, "error");
-    if (btn && btn.isConnected) {
+    if (btn?.isConnected) {
       btn.disabled = false;
       btn.textContent = "Clean Up";
     }

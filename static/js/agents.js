@@ -52,8 +52,8 @@ function renderAgentList() {
     filtered.length +
     " agent" +
     (filtered.length !== 1 ? "s" : "") +
-    (staleCount ? " · " + staleCount + " stale" : "") +
-    (failingCount ? " · " + failingCount + " failing" : "");
+    (staleCount ? ` · ${staleCount} stale` : "") +
+    (failingCount ? ` · ${failingCount} failing` : "");
 }
 
 function selectAgent(path) {
@@ -108,7 +108,7 @@ function renderAgentDetail() {
         <div class="detail-version">${escHtml(agent.scope)} agent${agent.stale ? ' — <span style="color:var(--danger);font-weight:600">STALE</span>' : ""}</div>
         <div class="detail-dates">
           Executable: ${escHtml(agent.executable || "N/A")}<br>
-          ${agent.script ? "Script: " + escHtml(agent.script) + "<br>" : ""}
+          ${agent.script ? `Script: ${escHtml(agent.script)}<br>` : ""}
           Exists: ${agent.exe_exists === null ? "Unknown (not readable or not checkable)" : agent.exe_exists ? "Yes" : '<strong style="color:var(--danger)">No (missing)</strong>'}<br>
           Status: ${status}<br>
           Runs at login: ${agent.run_at_load ? "Yes" : "No"}<br>
@@ -175,14 +175,14 @@ async function doAgentRemove() {
       await fetchAgents();
     } else if (result.failed && result.failed.length > 0) {
       showToast(`Failed: ${result.failed[0].error}`, "error");
-      if (btn && btn.isConnected) {
+      if (btn?.isConnected) {
         btn.disabled = false;
         btn.textContent = "Remove";
       }
     }
   } catch (e) {
     showToast(`Failed to remove agent: ${e.message}`, "error");
-    if (btn && btn.isConnected) {
+    if (btn?.isConnected) {
       btn.disabled = false;
       btn.textContent = "Remove";
     }

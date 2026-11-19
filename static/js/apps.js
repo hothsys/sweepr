@@ -85,9 +85,9 @@ function renderAppList() {
     const meta =
       app.version +
       (app.last_used
-        ? " · Used " + formatDate(app.last_used)
+        ? ` · Used ${formatDate(app.last_used)}`
         : app.last_updated
-          ? " · Released " + formatDate(app.last_updated)
+          ? ` · Released ${formatDate(app.last_updated)}`
           : "");
     html += `<div class="app-item${sel}${sys}" data-id="${escHtml(id)}" onclick="selectApp(this.dataset.id)">
       <div class="app-icon">
@@ -102,7 +102,7 @@ function renderAppList() {
   }
   appListEl.innerHTML = html;
   document.getElementById("tabCount").textContent =
-    filtered.length + " app" + (filtered.length !== 1 ? "s" : "");
+    `${filtered.length} app${filtered.length !== 1 ? "s" : ""}`;
 }
 
 async function selectApp(id) {
@@ -226,7 +226,7 @@ function renderDetailLoading() {
       </div>
       <div>
         <div class="detail-title">${escHtml(app.name)}</div>
-        <div class="detail-version">${escHtml(app.version)}${app.category ? " · " + escHtml(app.category) : ""}</div>
+        <div class="detail-version">${escHtml(app.version)}${app.category ? ` · ${escHtml(app.category)}` : ""}</div>
         <div class="detail-path">${escHtml(app.path)}</div>
         <div class="detail-size">${app.size ? formatBytes(app.size) : "Calculating..."}</div>
         <div class="detail-dates">${formatDetailDates(app)}</div>
@@ -318,7 +318,7 @@ function renderDetail() {
       const f = associatedFiles[i];
       // Files also used by another installed copy of the app start unchecked;
       // containers macOS protects can't be removed at all
-      const shared = f.shared_with && f.shared_with.length;
+      const shared = f.shared_with?.length;
       filesHtml += `<div class="file-item">
         <input type="checkbox" ${f.protected ? "disabled" : shared ? "" : "checked"} data-idx="${i}">
         <span class="file-category">${escHtml(f.category)}</span>
@@ -332,7 +332,7 @@ function renderDetail() {
   // Computed from the data, not the DOM: the panel still holds the previous app's
   // checkboxes at this point, whose indexes may not exist in associatedFiles
   const totalSelected = associatedFiles
-    .filter((f) => !f.protected && !(f.shared_with && f.shared_with.length))
+    .filter((f) => !f.protected && !f.shared_with?.length)
     .reduce((sum, f) => sum + (f.size || 0), 0);
   const canTrash = !app.is_system && !app.is_self && !isRemoving;
 
@@ -343,7 +343,7 @@ function renderDetail() {
       </div>
       <div>
         <div class="detail-title">${escHtml(app.name)} ${runBadge}</div>
-        <div class="detail-version">${escHtml(app.version)}${app.category ? " · " + escHtml(app.category) : ""}</div>
+        <div class="detail-version">${escHtml(app.version)}${app.category ? ` · ${escHtml(app.category)}` : ""}</div>
         <div class="detail-size">${app.size ? formatBytes(app.size) : "Calculating..."}</div>
         <div class="detail-dates">${formatDetailDates(app)}</div>
       </div>
@@ -401,7 +401,7 @@ function calcSelectedTotal() {
   const checkboxes = detailPanel.querySelectorAll('.file-item input[type="checkbox"]');
   checkboxes.forEach((cb) => {
     if (cb.checked) {
-      const idx = parseInt(cb.dataset.idx);
+      const idx = parseInt(cb.dataset.idx, 10);
       if (associatedFiles[idx]) total += associatedFiles[idx].size || 0;
     }
   });
@@ -448,7 +448,7 @@ function brewPackageForApp(app) {
 
 function confirmBrewAppUninstall() {
   const app = selectedApp;
-  if (!app || !app.brew_cask) return;
+  if (!app?.brew_cask) return;
   const pkg = brewPackageForApp(app);
   const running = app._running
     ? `<strong>${escHtml(app.name)}</strong> is running. Sweepr will quit it first, so save any open work now.<br><br>`
@@ -468,7 +468,7 @@ async function doBrewAppUninstall() {
   const options = readBrewUninstallOptions();
   document.querySelector(".modal-overlay")?.remove();
   const app = selectedApp;
-  if (!app || !app.brew_cask) return;
+  if (!app?.brew_cask) return;
   isRemoving = true;
   const btn = detailPanel.querySelector(".btn-trash");
   if (btn) {
@@ -488,7 +488,7 @@ async function doBrewAppUninstall() {
     _brewPromise = null; // the Homebrew tab's list is out of date now
   } catch (e) {
     showToast(`Uninstall failed: ${e.message}`, "error");
-    if (btn && btn.isConnected) {
+    if (btn?.isConnected) {
       btn.disabled = false;
       btn.textContent = "Uninstall with Homebrew";
     }
@@ -501,7 +501,7 @@ function getSelectedFiles() {
   const sizes = [];
   detailPanel.querySelectorAll('.file-item input[type="checkbox"]').forEach((cb) => {
     if (cb.checked) {
-      const idx = parseInt(cb.dataset.idx);
+      const idx = parseInt(cb.dataset.idx, 10);
       paths.push(associatedFiles[idx].path);
       sizes.push(associatedFiles[idx].size);
     }
@@ -534,12 +534,10 @@ async function doTrash() {
     if (result.success && result.success.length > 0) {
       const appTrashed = result.success.includes(app.path);
       const notes = [];
-      if (result.quit && result.quit.was_running)
-        notes.push(result.quit.forced ? "force-quit it" : "quit it");
-      if (result.login_items_removed && result.login_items_removed.length)
-        notes.push("removed its login item");
+      if (result.quit?.was_running) notes.push(result.quit.forced ? "force-quit it" : "quit it");
+      if (result.login_items_removed?.length) notes.push("removed its login item");
       showToast(
-        `Moved ${result.success.length} item(s) to Trash${notes.length ? " (" + notes.join(", ") + ")" : ""}`,
+        `Moved ${result.success.length} item(s) to Trash${notes.length ? ` (${notes.join(", ")})` : ""}`,
         "success",
       );
       if (appTrashed) {
