@@ -10,6 +10,12 @@ Sweepr logs everything it does to a rotating file, so you can audit exactly what
 | `/tmp/sweepr.stdout.log` | Standard output when run as a LaunchAgent |
 | `/tmp/sweepr.stderr.log` | Standard error when run as a LaunchAgent |
 
+Watch the application log live with:
+
+```bash
+tail -F sweepr.log
+```
+
 The application log is the one that matters day to day. The `/tmp` files only capture raw process output from the launchd service.
 
 ## Format and level
