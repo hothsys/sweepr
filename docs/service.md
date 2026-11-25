@@ -1,6 +1,6 @@
 # Running as a service
 
-Sweepr can run continuously in the background as a macOS LaunchAgent, so the UI is always a browser refresh away without a terminal open. This covers how that works and how to control it. For the quick command reference, see the README.
+Sweepr can run continuously in the background as a macOS LaunchAgent, so the UI is always a browser refresh away without a terminal open. This covers how that works and how to control it.
 
 ## The LaunchAgent
 
@@ -33,12 +33,20 @@ On startup the server writes its PID to `/tmp/sweepr.pid` and, if that file alre
 
 ## Starting and stopping
 
+If you started Sweepr manually with `python3 server.py`, press **Ctrl+C** in the terminal. If it is running as a login item:
+
 ```bash
-# Start (for this login session)
+# Stop for this session only. It will restart automatically on next login
+launchctl stop com.sweepr.server
+
+# Start it again after stopping (without needing to log out)
 launchctl start com.sweepr.server
 
-# Stop (for this login session; returns at next login)
-launchctl stop com.sweepr.server
+# Remove it as a login item permanently and stop it now
+bash launchagent/uninstall.sh
+
+# Re-add it as a login item after uninstalling
+bash launchagent/install.sh
 ```
 
 ## Gotcha: manual instances are invisible to launchctl
