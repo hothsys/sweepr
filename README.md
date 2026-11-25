@@ -38,11 +38,13 @@ Full documentation lives in the [`docs/`](docs/) folder:
 | [Logging](docs/logging.md) | Log files, rotation, and reading a refresh in the log |
 | [Troubleshooting](docs/troubleshooting.md) | Common messages and how to resolve them |
 
+## Disclaimer
+
+Sweepr moves files to the Trash; it does not permanently delete them immediately. However, removing the wrong application or associated files can break software or affect system behaviour. **Use at your own risk.** Always verify what you are removing before confirming. The authors accept no responsibility for data loss or system issues resulting from use of this software.
+
 ## License
 
 This project is licensed under the [MIT](LICENSE.md) License. See the [LICENSE.md](LICENSE.md) file for details.
-
-Sweepr moves files to the Trash; it does not permanently delete them immediately. However, removing the wrong application or associated files can break software or affect system behaviour. **Use at your own risk.** Always verify what you are removing before confirming. The authors accept no responsibility for data loss or system issues resulting from use of this software.
 
 ---
 
