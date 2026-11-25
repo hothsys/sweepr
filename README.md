@@ -6,7 +6,7 @@ Sweepr scans your Mac for installed apps and leftover files, warns before risky 
 
 ## Quick Start
 
-Requirements: macOS and Python 3.8+. The `python3` from Apple's Command Line Tools works, and macOS offers to install them the first time you run `python3`. No pip install, no build step, no external Python packages.
+Requirements: macOS and Python 3.8+ ([Python on macOS](https://docs.python.org/3/using/mac.html) covers installing it). No pip install, no build step, no external Python packages.
 
 ```bash
 git clone https://github.com/hothsys/sweepr
