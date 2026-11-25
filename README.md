@@ -4,7 +4,7 @@
 
 <h1 align="center">Sweepr</h1>
 
-*A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, LaunchAgents, and orphaned files left behind by uninstalled apps.*
+<p align="center"><em>A macOS system cleaner that finds and removes applications, Homebrew packages, npm globals, LaunchAgents, and orphaned files left behind by uninstalled apps.</em></p>
 
 Sweepr scans your Mac for installed apps and leftover files, warns before risky removals, and moves what you remove to the Trash. It runs as a small local Python server with a browser UI.
 
